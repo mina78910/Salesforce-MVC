@@ -737,60 +737,60 @@
         .toast-text strong { display: block; font-size: 12px; margin-bottom: 2px; }
         .toast-text p { margin: 0; font-size: 10px; opacity: 0.9; }
 
-        /* フォーム個別エラー表示 */
-        .form-error-toast {
-            position: absolute;
-            top: -20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #c23934;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: bold;
-            white-space: nowrap;
-            opacity: 0;
-            transition: opacity 0.3s, top 0.3s;
-            pointer-events: none;
-            z-index: 40;
-            box-shadow: 0 4px 8px rgba(194, 57, 52, 0.35);
-        }
-        .form-error-toast::after {
-            content: ''; position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
-            border-width: 4px 4px 0; border-style: solid; border-color: #c23934 transparent transparent transparent;
-        }
-        .form-error-toast.show {
-            opacity: 1;
-            top: -35px;
-        }
-
-        /* フォーム個別成功表示 */
+        /* フォーム個別トースト表示（Salesforce風に画面上部へ重ねる） */
+        .form-error-toast,
         .form-success-toast {
             position: absolute;
-            top: -20px;
+            top: 10px;
             left: 50%;
-            transform: translateX(-50%);
-            background: #04844b;
+            transform: translate(-50%, -12px);
             color: white;
-            padding: 6px 12px;
+            padding: 10px 18px;
             border-radius: 4px;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: bold;
+            line-height: 1;
             white-space: nowrap;
             opacity: 0;
-            transition: opacity 0.3s, top 0.3s;
+            transition: opacity 0.3s, transform 0.3s;
             pointer-events: none;
-            z-index: 40;
-            box-shadow: 0 4px 8px rgba(4, 132, 75, 0.3);
+            z-index: 220;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
-        .form-success-toast::after {
-            content: ''; position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
-            border-width: 4px 4px 0; border-style: solid; border-color: #04844b transparent transparent transparent;
+        .form-error-toast {
+            background: #c23934;
         }
+        .form-success-toast {
+            background: #04844b;
+        }
+        .form-error-toast::before,
+        .form-success-toast::before {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            line-height: 1;
+            flex: 0 0 auto;
+        }
+        .form-error-toast::before {
+            content: '✕';
+            color: #c23934;
+        }
+        .form-success-toast::before {
+            content: '✓';
+            color: #04844b;
+        }
+        .form-error-toast.show,
         .form-success-toast.show {
             opacity: 1;
-            top: -35px;
+            transform: translate(-50%, 0);
         }
 
         /* フォームの処理中インジケーター */
