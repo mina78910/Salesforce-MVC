@@ -1,0 +1,2138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salesforce 画面→ロジック→データベース デジタルMAP</title>
+    <style>
+        /* ベーススタイル */
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #eef2f6;
+            color: #080707;
+            overflow: hidden;
+        }
+
+        /* 速度調整用のCSS変数 (JSから動的に書き換えます) */
+        :root {
+            --speed-ratio: 0.67; /* デフォルト 1.5倍速時の時間比率 (1 / 1.5) */
+        }
+
+        /* ヘッダー */
+        .header {
+            background: #1589ee;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 100;
+        }
+        .header-title {
+            display: flex;
+            align-items: center;
+        }
+        .header-title svg {
+            margin-right: 10px;
+        }
+
+        /* グローバルコントロール (ヘッダー内) */
+        .global-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-global {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .btn-global:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .btn-global:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-global.primary {
+            background: white;
+            color: #1589ee;
+            border-color: white;
+        }
+        .btn-global.primary:hover {
+            background: #f4f6f9;
+        }
+        .btn-global.success {
+            background: #04844b;
+            border-color: #04844b;
+        }
+        .btn-global.success:hover {
+            background: #036b3d;
+        }
+        .btn-global.danger {
+            background: #c23934;
+            border-color: #c23934;
+        }
+
+        /* 速度調整用セレクトボックス */
+        .speed-selector-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .speed-selector-container span {
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+        }
+        .speed-selector-container select {
+            background: white;
+            color: #080707; /* 文字色を黒にして視認性を確保 */
+            border: none;
+            font-size: 12px;
+            font-weight: bold;
+            outline: none;
+            cursor: pointer;
+            border-radius: 3px;
+            padding: 2px 6px;
+        }
+        .speed-selector-container select option {
+            color: #080707; /* 展開時の選択肢も黒にする */
+            background: white;
+        }
+
+        /* 全体コンテナ */
+        .architecture-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 50px);
+            position: relative;
+        }
+
+        /* 各層の共通スタイル */
+        .tier {
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-bottom: 2px dashed #c9c7c5;
+            box-sizing: border-box;
+        }
+        .tier-label {
+            position: absolute;
+            left: 20px;
+            top: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #706e6b;
+            background: rgba(255,255,255,0.9);
+            padding: 4px 12px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 50;
+        }
+
+        /* データベース層のラベル位置調整 (左寄せをキープしつつ、上へ少し逃がして解説パネルとの重なりを回避) */
+        .tier-db .tier-label {
+            left: 20px;
+            top: -15px;
+        }
+
+        /* === 上段: UI層 (画面) === */
+        .tier-ui {
+            flex: 1.4;
+            background: linear-gradient(to bottom, #ffffff, #f4f6f9);
+            padding-top: 35px;
+            z-index: 30;
+        }
+        
+        /* フォーム群のレイアウト */
+        .forms-wrapper {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            width: 100%;
+            padding: 0 20px;
+        }
+
+        /* 個別フォームカード */
+        .form-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            width: 280px; /* 3つ並べるため少し細身に */
+            border-top: 4px solid #1589ee;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .form-card[data-user="1"] { border-top-color: #1589ee; } /* 東京 */
+        .form-card[data-user="2"] { border-top-color: #04844b; } /* 大阪 */
+        .form-card[data-user="3"] { border-top-color: #e28705; } /* 福岡 */
+
+        .form-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e5ee;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+        }
+        .user-badge {
+            font-size: 12px;
+            font-weight: bold;
+            color: #16325c;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* ユーザーアバター */
+        .user-avatar {
+            position: absolute;
+            top: -24px;
+            right: 15px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            border: 2px solid white;
+            z-index: 160; /* アクションオーバーレイ(150)より上に表示 */
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        .form-card:hover .user-avatar {
+            transform: scale(1.1);
+        }
+
+        .form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+        .input-group label {
+            display: block; font-size: 11px; color: #3e3e3c; margin-bottom: 2px; font-weight: bold;
+        }
+        .input-group input {
+            width: 100%; padding: 6px; border: 1px solid #d8dde6; border-radius: 4px;
+            box-sizing: border-box; font-size: 12px; background: #fbfbfb; pointer-events: none;
+        }
+        
+        /* データ発射口 */
+        .form-outlet {
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 15px;
+            background: #e0e5ee;
+            border-radius: 0 0 15px 15px;
+            border: 2px solid #c9c7c5;
+            border-top: none;
+            z-index: 5;
+        }
+
+        /* === 中段: ロジック層 === */
+        .tier-logic {
+            flex: 0.8;
+            background: #eef2f6;
+            background-image: radial-gradient(#d8dde6 1px, transparent 1px);
+            background-size: 20px 20px;
+            z-index: 20;
+        }
+
+        .logic-machine {
+            background: #2b2826;
+            width: 280px;
+            height: 70px;
+            border-radius: 8px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2), inset 0 2px 5px rgba(255,255,255,0.2);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #54698d;
+        }
+        .logic-machine::before, .logic-machine::after {
+            content: ''; position: absolute; width: 60px; height: 100%; background: rgba(0,0,0,0.5); top: 0; z-index: 15;
+        }
+        .logic-machine::before { left: 0; border-radius: 6px 0 0 6px; border-right: 2px dashed #54698d;}
+        .logic-machine::after { right: 0; border-radius: 0 6px 6px 0; border-left: 2px dashed #54698d;}
+        
+        .logic-title {
+            position: absolute; top: -25px; color: #16325c; font-size: 13px; font-weight: bold;
+            background: white; padding: 2px 10px; border-radius: 10px; border: 1px solid #d8dde6;
+        }
+        
+        .processing-zone {
+            width: 150px; height: 50px; background: #16325c; border-radius: 4px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.85); position: relative; overflow: hidden; z-index: 5;
+        }
+        
+        .gear {
+            position: absolute; color: rgba(255, 255, 255, 0.15); font-size: 40px;
+            line-height: 1; animation: spin calc(4s * var(--speed-ratio)) linear infinite; /* 速度選択に連動 */
+        }
+        .gear1 { top: -10px; left: -10px; }
+        .gear2 { bottom: -15px; right: -5px; animation-direction: reverse; font-size: 50px;}
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .logic-flash {
+            position: absolute; inset: 0; background: rgba(76, 217, 100, 0.4);
+            opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 20; border-radius: 8px;
+        }
+        .logic-machine.active .logic-flash { opacity: 1; }
+        .logic-machine.error .logic-flash { background: rgba(194, 57, 52, 0.4); opacity: 1; } /* エラー時の赤フラッシュ */
+
+        /* バッチ処理層 */
+        .batch-logic-wrapper {
+            position: absolute;
+            right: 50px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 220px;
+            height: 70px;
+            background: #2b2826;
+            border-radius: 8px;
+            border: 2px solid #6a1b9a;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2), inset 0 2px 5px rgba(255,255,255,0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 15;
+            flex-direction: column;
+        }
+        .batch-logic-wrapper::before, .batch-logic-wrapper::after {
+            content: ''; position: absolute; width: 40px; height: 100%; background: rgba(0,0,0,0.5); top: 0; z-index: 10;
+        }
+        .batch-logic-wrapper::before { left: 0; border-radius: 6px 0 0 6px; border-right: 2px dashed #6a1b9a;}
+        .batch-logic-wrapper::after { right: 0; border-radius: 0 6px 6px 0; border-left: 2px dashed #6a1b9a;}
+
+        .batch-logic-title {
+            position: absolute;
+            top: -25px;
+            background: white;
+            padding: 2px 10px;
+            border-radius: 10px;
+            border: 1px solid #d8dde6;
+            font-size: 13px;
+            font-weight: bold;
+            color: #6a1b9a;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            white-space: nowrap;
+            z-index: 20;
+        }
+        .batch-logic-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 150px;
+            height: 50px;
+            background: #311b54;
+            border-radius: 4px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+            position: relative;
+            overflow: hidden;
+            z-index: 5;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            text-align: left;
+            line-height: 1.3;
+        }
+        .batch-icon-display {
+            font-size: 32px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+        .batch-logic-flash {
+            position: absolute; inset: 0; background: rgba(224, 64, 251, 0.4);
+            opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 20; border-radius: 6px;
+        }
+        .batch-logic-wrapper.active .batch-logic-flash { opacity: 1; }
+
+        /* === 下段: データベース層 === */
+        .tier-db {
+            flex: 1.5;
+            background: linear-gradient(to top, #ffffff, #f4f6f9);
+            border-bottom: none;
+            padding-bottom: 20px;
+            align-items: flex-end;
+            z-index: 25; /* 10から25に引き上げて、中段ロジック層(z-index: 20)より前面に表示 */
+        }
+
+        /* 陸続きの背景: tier-db of 右側にロジック層を延長 */
+        .tier-db::before {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: -2px; /* tier-logicの下ボーダーを隠して繋げる */
+            width: 320px; /* 右側エリアの幅 */
+            height: calc(100% + 2px);
+            background: #eef2f6;
+            background-image: radial-gradient(#d8dde6 1px, transparent 1px);
+            background-size: 20px 20px;
+            border-left: 2px dashed #c9c7c5;
+            z-index: 0;
+        }
+
+        /* 背景のルートガイド線 (SVG) */
+        .route-guide {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .route-line {
+            fill: none;
+            stroke: #b0adab;
+            stroke-width: 2;
+            stroke-dasharray: 6 4;
+            opacity: 0.5;
+        }
+        .route-label {
+            fill: #706e6b;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .database-wrapper {
+            position: relative;
+            margin-bottom: 20px;
+            z-index: 10;
+        }
+        /* titleのみを非表示にし、ドラム缶コンテナのエフェクト自体は綺麗に復活させる */
+        .database-title {
+            display: none !important;
+        }
+        .database-box {
+            position: relative;
+            width: 220px;
+            height: 280px;
+        }
+        .box-back {
+            position: absolute; inset: 0; background: rgba(21, 137, 238, 0.03);
+            border: 3px solid #1589ee; border-top: none; border-radius: 0 0 8px 8px;
+            box-shadow: inset 0 0 20px rgba(21, 137, 238, 0.1);
+        }
+        .box-back::after {
+            content: ''; position: absolute; top: -8px; left: -3px; width: 220px; height: 16px;
+            border-radius: 50%; border: 3px solid #1589ee; background: rgba(255, 255, 255, 0.8);
+        }
+        .box-front {
+            position: absolute; top: -8px; left: -3px; width: 220px; height: 16px;
+            border-radius: 50%; border-bottom: 3px solid #1589ee; z-index: 30;
+        }
+        .capacity-marks {
+            position: absolute; left: -25px; top: 0; bottom: 0; width: 20px;
+        }
+
+        /* Afterロジック層 */
+        .after-logic-wrapper {
+            position: absolute;
+            right: 50px;
+            bottom: 120px; /* 位置を下げてDBと水平くらいに */
+            width: 220px;
+            height: 70px;
+            background: #2b2826;
+            border-radius: 8px;
+            border: 2px solid #54698d;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2), inset 0 2px 5px rgba(255,255,255,0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 15;
+            flex-direction: column;
+        }
+        .after-logic-wrapper::before, .after-logic-wrapper::after {
+            content: ''; position: absolute; width: 40px; height: 100%; background: rgba(0,0,0,0.5); top: 0; z-index: 10;
+        }
+        .after-logic-wrapper::before { left: 0; border-radius: 6px 0 0 6px; border-right: 2px dashed #54698d;}
+        .after-logic-wrapper::after { right: 0; border-radius: 0 6px 6px 0; border-left: 2px dashed #54698d;}
+
+        .after-logic-title {
+            position: absolute;
+            top: -52px; /* 被りを防ぐため1行分（約14px）上へ引き上げ */
+            background: white;
+            padding: 4px 10px;
+            border-radius: 10px;
+            border: 1px solid #d8dde6;
+            font-size: 13px;
+            font-weight: bold;
+            color: #16325c;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            text-align: center;
+            z-index: 20;
+            line-height: 1.3;
+        }
+        .after-logic-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 150px;
+            height: 50px;
+            background: #16325c;
+            border-radius: 4px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+            position: relative;
+            overflow: hidden;
+            z-index: 5;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            text-align: left;
+            line-height: 1.3;
+        }
+        .mail-icon-display {
+            font-size: 32px; /* アイコンを大きく */
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); /* 影を追加して視認性アップ */
+        }
+        .after-logic-flash {
+            position: absolute; inset: 0; background: rgba(76, 217, 100, 0.4);
+            opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 20; border-radius: 6px;
+        }
+        .after-logic-wrapper.active .after-logic-flash {
+            opacity: 1;
+        }
+
+        /* アニメーション用飛翔メール */
+        .flying-mail {
+            position: absolute;
+            font-size: 40px; /* アニメーション中のアイコンも大きく */
+            z-index: 200;
+            will-change: top, left, transform, opacity;
+            pointer-events: none;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4)); /* アニメーション中も影を強調 */
+        }
+
+        /* === レコードブロック === */
+        .record-item {
+            position: absolute;
+            width: 190px;
+            height: 24px;
+            background: white;
+            border: 1px solid #d8dde6;
+            border-radius: 4px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            padding: 0 6px;
+            font-size: 11px;
+            color: #16325c;
+            z-index: 25;
+            box-sizing: border-box;
+            will-change: transform, top, left;
+            justify-content: flex-start;
+        }
+        
+        .rec-badge {
+            font-size: 9px;
+            font-weight: bold;
+            color: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin-right: 6px;
+        }
+        .record-item.op-insert .rec-badge { background: #0070d2; }
+        .record-item.op-update .rec-badge { background: #e28705; }
+        .record-item.op-update { border-color: #e28705; }
+        
+        /* エラー跳ね返り用レコード */
+        .record-item.op-error {
+            border-color: #c23934;
+            background: #fdf5f4;
+        }
+        .record-item.op-error .rec-badge {
+            background: #c23934;
+        }
+        .record-item.op-error .zipcode {
+            color: #c23934;
+        }
+
+        /* フェッチ（取得）中のレコード */
+        .record-item.fetching {
+            opacity: 1;
+            border: 2px dashed #e28705;
+            background: #fff8eb;
+            box-shadow: 0 0 15px rgba(226, 135, 5, 0.6);
+            z-index: 100;
+            pointer-events: none;
+        }
+        .record-item.fetching .rec-badge {
+            background: #e28705 !important;
+        }
+
+        .record-item .zipcode {
+            color: #c23934; font-family: monospace; font-weight: bold; margin-right: 6px; flex-shrink: 0;
+            transition: color 0.3s;
+        }
+        .record-item .acc-name {
+            color: #706e6b; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        /* Bulkレコードブロック */
+        .record-bulk {
+            position: absolute;
+            width: 190px;
+            background: white;
+            border: 2px dashed #e28705;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(226, 135, 5, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 6px;
+            z-index: 25;
+            box-sizing: border-box;
+            will-change: transform, top, left;
+            justify-content: flex-start;
+        }
+        .record-bulk-header {
+            font-size: 10px;
+            font-weight: bold;
+            color: #e28705;
+            text-align: center;
+            border-bottom: 1px solid #fce8cd;
+            padding-bottom: 2px;
+            margin-bottom: 2px;
+        }
+        .record-bulk-item {
+            display: flex;
+            align-items: center;
+            font-size: 10px;
+            color: #16325c;
+            background: #fff8eb;
+            border-radius: 2px;
+            padding: 2px 4px;
+        }
+        .record-bulk-item .zipcode {
+            color: #c23934; font-family: monospace; font-weight: bold; margin-right: 6px; flex-shrink: 0;
+            transition: color 0.3s;
+        }
+        .record-bulk-item .acc-name {
+            color: #706e6b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        /* リストビュー用スタイル */
+        .list-view-container {
+            margin-bottom: 5px;
+            border: 1px solid #d8dde6;
+            border-radius: 4px;
+            overflow: hidden;
+            background: #fbfbfb;
+        }
+        .list-view-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+        .list-view-table th {
+            background: #f4f6f9;
+            color: #706e6b;
+            padding: 4px 6px;
+            text-align: left;
+            border-bottom: 1px solid #d8dde6;
+            font-weight: bold;
+        }
+        .list-view-table td {
+            padding: 4px 6px;
+            border-bottom: 1px solid #e0e5ee;
+            color: #16325c;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100px;
+        }
+        .list-view-table tr:last-child td { border-bottom: none; }
+
+        /* ロジック処理後 (速度選択に連動) */
+        @keyframes recordFlashInsert {
+            0% { transform: scale(1); }
+            50% { background: #eef2f6; transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        @keyframes recordFlashUpdate {
+            0% { transform: scale(1); }
+            50% { background: #fff8eb; border-color: #e28705; transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .processed.op-insert { animation: recordFlashInsert calc(0.4s * var(--speed-ratio)) ease; }
+        .processed.op-update, .record-bulk.processed { animation: recordFlashUpdate calc(0.4s * var(--speed-ratio)) ease; }
+        .processed .zipcode { color: #04844b; }
+
+        /* DB更新フラッシュ (速度選択に連動) */
+        @keyframes dbUpdateFlash {
+            0% { background: white; }
+            30% { background: #e28705; color: white; border-color: #e28705; transform: scale(1.02); }
+            100% { background: white; color: #16325c; transform: scale(1); }
+        }
+        .db-updated { animation: dbUpdateFlash calc(0.6s * var(--speed-ratio)) ease; }
+        .db-updated .zipcode { color: #04844b !important; }
+
+        /* エラートースト */
+        .toast {
+            position: fixed; top: -80px; left: 50%; transform: translateX(-50%);
+            background: #c23934; color: white; padding: 10px 20px; border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1000; transition: top 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s;
+            opacity: 0; display: flex; align-items: center;
+        }
+        .toast.show { opacity: 1; top: 20px; }
+        .toast-icon {
+            font-size: 18px; margin-right: 10px; background: white; border-radius: 50%;
+            width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: #c23934;
+        }
+        .toast-text strong { display: block; font-size: 12px; margin-bottom: 2px; }
+        .toast-text p { margin: 0; font-size: 10px; opacity: 0.9; }
+
+        /* フォーム個別エラー表示 */
+        .form-error-toast {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #c23934;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s, top 0.3s;
+            pointer-events: none;
+            z-index: 40;
+            box-shadow: 0 4px 8px rgba(194, 57, 52, 0.35);
+        }
+        .form-error-toast::after {
+            content: ''; position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
+            border-width: 4px 4px 0; border-style: solid; border-color: #c23934 transparent transparent transparent;
+        }
+        .form-error-toast.show {
+            opacity: 1;
+            top: -35px;
+        }
+
+        /* フォーム個別成功表示 */
+        .form-success-toast {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #04844b;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s, top 0.3s;
+            pointer-events: none;
+            z-index: 40;
+            box-shadow: 0 4px 8px rgba(4, 132, 75, 0.3);
+        }
+        .form-success-toast::after {
+            content: ''; position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
+            border-width: 4px 4px 0; stroke: solid; border-color: #04844b transparent transparent transparent;
+        }
+        .form-success-toast.show {
+            opacity: 1;
+            top: -35px;
+        }
+
+        /* フォームの処理中インジケーター */
+        .form-action-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.75);
+            border-radius: 6px;
+            z-index: 150;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .form-action-overlay.show { opacity: 1; }
+
+        .form-action-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: white;
+            border: 2px solid;
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s, transform 0.3s;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            width: 85%;
+            box-sizing: border-box;
+        }
+        .form-action-indicator.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        .form-action-indicator .action-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+        .form-action-indicator .action-desc {
+            font-size: 11px;
+            color: #3e3e3c;
+            font-weight: bold;
+        }
+        .form-action-indicator.insert { border-color: #0070d2; background: #f0f8ff; }
+        .form-action-indicator.insert .action-title { color: #0070d2; }
+        .form-action-indicator.update { border-color: #e28705; background: #fff8eb; }
+        .form-action-indicator.update .action-title { color: #e28705; }
+        .form-action-indicator.update-multi { border-color: #e28705; background: #fff8eb; }
+        .form-action-indicator.update-multi .action-title { color: #e28705; }
+
+        /* シェイク (速度選択に連動) */
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-2px, 0); }
+            40% { transform: translate(2px, 0); }
+            60% { transform: translate(-2px, 0); }
+            80% { transform: translate(2px, 0); }
+        }
+        .shake { animation: shake calc(0.2s * var(--speed-ratio)); }
+
+        /* 夜中0:00 インジケーター演出 */
+        .midnight-indicator {
+            position: absolute;
+            right: 40px;
+            top: 25%;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s, transform 0.5s;
+            transform: translateY(15px);
+        }
+        .midnight-indicator.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .midnight-text {
+            color: #311b54;
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .midnight-subtext {
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            background: #6a1b9a;
+            padding: 6px 12px;
+            border-radius: 20px;
+            box-shadow: 0 4px 8px rgba(106, 27, 154, 0.3);
+        }
+
+        /* 補足案内吹き出し */
+        .info-bubble {
+            position: absolute;
+            left: 20px;
+            bottom: 20px;
+            width: 320px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #d8dde6;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            padding: 12px 16px;
+            z-index: 100;
+            font-size: 11px;
+            color: #16325c;
+            line-height: 1.4;
+            backdrop-filter: blur(4px);
+            text-align: left;
+            pointer-events: auto;
+        }
+        .info-bubble-title {
+            font-weight: bold;
+            font-size: 12.5px;
+            border-bottom: 2px solid #1589ee;
+            padding-bottom: 4px;
+            margin-bottom: 8px;
+            color: #1589ee;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .info-bubble-section {
+            margin-bottom: 8px;
+        }
+        .info-bubble-section strong {
+            display: block;
+            color: #080707;
+            margin-bottom: 2px;
+        }
+        .info-bubble-section p {
+            margin: 0;
+            color: #04844b;
+            font-weight: bold;
+        }
+        .info-bubble-section ul {
+            margin: 0;
+            padding-left: 16px;
+            color: #3e3e3c;
+        }
+        .info-bubble-section li {
+            margin-bottom: 2px;
+        }
+        .info-bubble-footer {
+            font-size: 9px;
+            color: #706e6b;
+            border-top: 1px solid #e0e5ee;
+            padding-top: 4px;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ヘッダー & 全体コントロール -->
+    <header class="header">
+        <div class="header-title">
+            <svg width="22" height="16" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19.5 10C19.1 10 18.7 10.1 18.3 10.2C17.5 7.2 14.8 5 11.5 5C7.9 5 5 7.9 5 11.5C5 11.7 5 11.8 5.1 12C2.8 12.3 1 14.3 1 16.7C1 19.3 3.2 21.5 5.8 21.5H19.5C21.4 21.5 23 19.9 23 18C23 16.1 21.4 14.5 19.5 14.5C19.5 12 19.5 10 19.5 10Z"/>
+            </svg>
+            マルチユーザー データフロー
+        </div>
+        <div class="global-controls">
+            <!-- 速度切り替え選択リスト -->
+            <div class="speed-selector-container">
+                <span>再生速度:</span>
+                <select id="speedSelect">
+                    <option value="1.5" selected>1.5倍速 (標準)</option>
+                    <option value="1.0">1.0倍速 (等倍)</option>
+                    <option value="0.75">0.75倍速 (ゆっくり)</option>
+                </select>
+            </div>
+            
+            <button class="btn-global primary" id="submitBtn">1件実行</button>
+            <button class="btn-global success" id="autoBtn">▶ 自動実行</button>
+            <button class="btn-global" id="clearBtn">リセット</button>
+        </div>
+    </header>
+
+    <div id="toast" class="toast">
+        <div class="toast-icon">✕</div>
+        <div class="toast-text">
+            <strong>ストレージ制限超過</strong>
+            <p>データベースの容量が一杯です。Insertは失敗しました。</p>
+        </div>
+    </div>
+
+    <div class="architecture-container" id="container">
+        
+        <!-- バッチ処理用 夜間インジケーター -->
+        <div class="midnight-indicator" id="midnightOverlay">
+            <div class="midnight-text">🕛 夜中 0:00</div>
+            <div class="midnight-subtext">日次バッチ処理（会社名の一括クレンジング）実行中...</div>
+        </div>
+
+        <!-- 上段: UI層 (3つのフォーム) -->
+        <div class="tier tier-ui" id="tierUi">
+            <div class="tier-label">フロント（ページレイアウト、リストビュー等のユーザ入力）</div>
+            
+            <div class="forms-wrapper">
+                
+                <!-- フォーム1: 東京本社 -->
+                <div class="form-card" id="form1" data-user="1">
+                    <!-- 東京本社ユーザーアバター -->
+                    <div class="user-avatar" title="東京本社 エンドユーザー">
+                        <svg width="44" height="44" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="32" cy="32" r="32" fill="#1589ee"/>
+                            <path d="M18 28C18 18 24 14 32 14C40 14 46 18 46 28C46 30 44 32 44 32H20C20 32 18 30 18 28Z" fill="#080707"/>
+                            <circle cx="32" cy="28" r="11" fill="#fbd5d5"/>
+                            <path d="M21 21C25 17 32 17 32 17C32 17 39 17 43 21C44 23 45 26 45 26H19C19 26 20 23 21 21Z" fill="#080707"/>
+                            <path d="M14 52C14 42 22 38 32 38C42 38 50 42 50 52V56H14V52Z" fill="#005fb2"/>
+                            <polygon points="30,38 34,38 33,48 32,50 31,48" fill="#ffffff"/>
+                        </svg>
+                    </div>
+                    <div class="form-action-overlay" id="actionOverlay1"></div>
+                    <div class="form-action-indicator" id="actionInd1">
+                        <div class="action-title" id="actionTitle1"></div>
+                        <div class="action-desc" id="actionDesc1"></div>
+                    </div>
+                    <div class="form-error-toast" id="formErr1">エラー</div>
+                    <div class="form-success-toast" id="formSuccess1">成功</div>
+                    <div class="form-header">
+                        <div class="user-badge">🏢 東京本社</div>
+                    </div>
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label>取引先名</label>
+                            <input type="text" id="accName1" readonly>
+                        </div>
+                        <div class="input-group">
+                            <label>郵便番号</label>
+                            <input type="text" id="zipInput1" readonly>
+                        </div>
+                    </div>
+                    <div class="form-outlet" id="outlet1"></div>
+                </div>
+
+                <!-- フォーム2: 大阪支社 -->
+                <div class="form-card" id="form2" data-user="2">
+                    <!-- 大阪支社ユーザーアバター -->
+                    <div class="user-avatar" title="大阪支社 エンドユーザー">
+                        <svg width="44" height="44" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="32" cy="32" r="32" fill="#04844b"/>
+                            <path d="M16 26C16 16 22 12 32 12C42 12 48 16 48 26C48 30 44 32 44 32H20C20 32 16 30 16 26Z" fill="#78350f"/>
+                            <circle cx="32" cy="27" r="11" fill="#fde047"/>
+                            <path d="M21 20C25 15 32 15 32 15C32 15 39 15 43 20" fill="none" stroke="#78350f" stroke-width="4" stroke-linecap="round"/>
+                            <rect x="22" y="24" width="8" height="6" rx="2" fill="none" stroke="#080707" stroke-width="2"/>
+                            <rect x="34" y="24" width="8" height="6" rx="2" fill="none" stroke="#080707" stroke-width="2"/>
+                            <line x1="30" y1="27" x2="34" y2="27" stroke="#080707" stroke-width="2"/>
+                            <path d="M14 52C14 42 22 38 32 38C42 38 50 42 50 52V56H14V52Z" fill="#065f46"/>
+                        </svg>
+                    </div>
+                    <div class="form-action-overlay" id="actionOverlay2"></div>
+                    <div class="form-action-indicator" id="actionInd2">
+                        <div class="action-title" id="actionTitle2"></div>
+                        <div class="action-desc" id="actionDesc2"></div>
+                    </div>
+                    <div class="form-error-toast" id="formErr2">エラー</div>
+                    <div class="form-success-toast" id="formSuccess2">成功</div>
+                    <div class="form-header">
+                        <div class="user-badge">🏭 大阪支社</div>
+                    </div>
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label>取引先名</label>
+                            <input type="text" id="accName2" readonly>
+                        </div>
+                        <div class="input-group">
+                            <label>郵便番号</label>
+                            <input type="text" id="zipInput2" readonly>
+                        </div>
+                    </div>
+                    <div class="form-outlet" id="outlet2"></div>
+                </div>
+
+                <!-- フォーム3: 福岡営業所 -->
+                <div class="form-card" id="form3" data-user="3">
+                    <!-- 福岡営業所ユーザーアバター -->
+                    <div class="user-avatar" title="福岡営業所 エンドユーザー">
+                        <svg width="44" height="44" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="32" cy="32" r="32" fill="#e28705"/>
+                            <circle cx="32" cy="18" r="14" fill="#1e293b"/>
+                            <circle cx="32" cy="28" r="11" fill="#fed7aa"/>
+                            <path d="M20 24C20 18 24 15 32 15C40 15 44 18 44 24C44 26 42 28 42 28H22C22 28 20 26 20 24Z" fill="#1e293b"/>
+                            <circle cx="23" cy="20" r="3" fill="#ef4444"/>
+                            <path d="M14 52C14 42 22 38 32 38C42 38 50 42 50 52V56H14V52Z" fill="#b45309"/>
+                        </svg>
+                    </div>
+                    <div class="form-action-overlay" id="actionOverlay3"></div>
+                    <div class="form-action-indicator" id="actionInd3">
+                        <div class="action-title" id="actionTitle3"></div>
+                        <div class="action-desc" id="actionDesc3"></div>
+                    </div>
+                    <div class="form-error-toast" id="formErr3">エラー</div>
+                    <div class="form-success-toast" id="formSuccess3">成功</div>
+                    <div class="form-header">
+                        <div class="user-badge">🍜 福岡営業所</div>
+                    </div>
+                    
+                    <!-- 1件用 (Insert時) -->
+                    <div class="form-row" id="singleRow3">
+                        <div class="input-group">
+                            <label>取引先名</label>
+                            <input type="text" id="accName3" readonly>
+                        </div>
+                        <div class="input-group">
+                            <label>郵便番号</label>
+                            <input type="text" id="zipInput3" readonly>
+                        </div>
+                    </div>
+
+                    <!-- リストビュー用 (Update時) -->
+                    <div class="list-view-container" id="multiRow3" style="display:none;">
+                        <table class="list-view-table">
+                            <thead><tr><th>更新対象</th><th>新・郵便番号</th></tr></thead>
+                            <tbody id="multiRowBody3">
+                                <!-- JS de 動的生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="form-outlet" id="outlet3"></div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- 中段: ロジック層 -->
+        <div class="tier tier-logic" id="tierLogic">
+            <div class="tier-label">ロジック 層 (Apexトリガ / レコードトリガフロー)<br>※before イベント</div>
+            <div class="logic-machine" id="logicMachine">
+                <div class="logic-title">郵便番号 自動フォーマット処理</div>
+                <div class="logic-flash"></div>
+                <div class="processing-zone" id="logicZone">
+                    <div class="gear gear1">⚙</div>
+                    <div class="gear gear2">⚙</div>
+                </div>
+            </div>
+
+            <!-- バッチ処理層 -->
+            <div class="batch-logic-wrapper" id="batchLogicBox">
+                <div class="batch-logic-title">ロジック 層 (apexバッチ / スケジュールフロー)</div>
+                <div class="batch-logic-flash"></div>
+                <div class="batch-logic-content">
+                    <span class="batch-icon-display">🕒</span>
+                    <span>「株式会社」を<br>「(株)」へ一括変換</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 下段: データベース層 -->
+        <div class="tier tier-db" id="tierDb">
+            <div class="tier-label">データベース 層 (オブジェクト)</div>
+            
+            <svg class="route-guide" id="routeGuide">
+                <line id="routeInsert" x1="50%" y1="0" x2="50%" y2="100%" class="route-line" />
+                <path id="routeUpdate" d="" class="route-line" stroke="#e28705" />
+                <text id="labelInsert" x="51%" y="30" class="route-label">Insert</text>
+                <text id="labelUpdate" x="65%" y="30" class="route-label" fill="#e28705">Update</text>
+            </svg>
+
+            <div class="database-wrapper">
+                <!-- 「Account Object」の表示パネルのみ非表示とし、ドラム缶（データベースコンテナ）のビジュアル構造を復活させました -->
+                <div class="database-title">Account Object</div>
+                <div class="database-box" id="databaseBox">
+                    <div class="box-back"></div>
+                    <div class="capacity-marks">
+                        <div class="mark-max">10</div>
+                        <div class="mark-max-line"></div>
+                        <div class="mark-line" style="bottom: 20%"></div>
+                        <div class="mark-line" style="bottom: 40%"></div>
+                        <div class="mark-line" style="bottom: 60%"></div>
+                        <div class="mark-line" style="bottom: 80%"></div>
+                    </div>
+                    <div class="box-front"></div>
+                </div>
+            </div>
+
+            <!-- Afterロジック層をデータベース層の中に移動 (位置を下げて水平に) -->
+            <div class="after-logic-wrapper" id="afterLogicBox">
+                <div class="after-logic-title">ロジック 層 (Apexトリガ / レコードトリガフロー)<br>※after イベント</div>
+                <div class="after-logic-flash"></div>
+                <div class="after-logic-content">
+                    <span class="mail-icon-display">
+                        <svg width="1.2em" height="1.2em" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="32" cy="32" r="30" fill="#1589ee"/>
+                            <path d="M14 22 L50 22 L50 44 L14 44 Z" fill="#ffffff"/>
+                            <path d="M14 22 L32 36 L50 22" stroke="#1589ee" stroke-width="3" fill="none"/>
+                        </svg>
+                    </span>
+                    <span>営業担当へ<br>メール通知処理</span>
+                </div>
+            </div>
+
+            <!-- 左下の補足案内吹き出しパネル -->
+            <div class="info-bubble">
+                <div class="info-bubble-title">
+                    <span>💡 デモ解説 & 学習目的</span>
+                </div>
+                <div class="info-bubble-section">
+                    <strong>【処理手順（7ステップ固定ループ）】</strong>
+                    <p>1.新規 → 2.新規 → 3.新規 → 4.新規(エラー) → 5.更新 → 6.一括更新 → 7.バッチ</p>
+                </div>
+                <div class="info-bubble-section">
+                    <strong>【このデモの目的（学習イメージ）】</strong>
+                    <ul>
+                        <li>MVCモデル（3層構造）の関係を理解する</li>
+                        <li>更新時に裏で走る「既存レコードの読み込み」の可視化</li>
+                        <li>beforeトリガ（保存前の処理）と afterトリガ（保存後の処理：メール発信等）の役割の違い</li>
+                        <li>バッチ（一括）処理にのイメージ</li>
+                        <li>バッチとトリガの違いイメージ</li>
+                        <li>ロジックの実行順序のイメージ</li>
+                    </ul>
+                </div>
+                <div class="info-bubble-footer">※概念的な解説用イメージです。一部正確性をデフォルメしています。</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 設定値
+        const MAX_CAPACITY = 10; 
+        const RECORD_HEIGHT = 24;
+        const RECORD_MARGIN = 2;
+        const RECORD_WIDTH = 190;
+        
+        // 状態管理
+        let dbRecords = []; // { id, name, elem, topY }
+        let nextAccountId = 1;
+        let currentStep = 1; // 現在のステップ (1〜7)
+        
+        let isAutoRunning = false;
+        let autoTimeout; // 自律自動実行用のタイマー
+        let isAnimating = false;
+
+        // 速度制御用
+        let speedFactor = 1.5; 
+        let speedRatio = 1 / speedFactor; // 時間の掛け算用比率
+
+        // ミリ秒計算用ユーティリティ
+        function calcTime(baseMs) {
+            return baseMs * speedRatio;
+        }
+
+        // フォーム群の状態
+        const formsData = [
+            { id: 1, op: 'insert', targetDbIndex: -1, preName: '東京クラウド' },
+            { id: 2, op: 'insert', targetDbIndex: -1, preName: 'なにわシステム' },
+            { id: 3, op: 'insert', targetDbIndex: -1, preName: '博多テック' }
+        ];
+
+        // DOM
+        const container = document.getElementById('container');
+        const logicMachine = document.getElementById('logicMachine');
+        const logicZone = document.getElementById('logicZone');
+        const dbBox = document.getElementById('databaseBox');
+        
+        const submitBtn = document.getElementById('submitBtn');
+        const autoBtn = document.getElementById('autoBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const toast = document.getElementById('toast');
+        const speedSelect = document.getElementById('speedSelect');
+
+        // 速度変更イベントリスナーの登録
+        speedSelect.addEventListener('change', (e) => {
+            speedFactor = parseFloat(e.target.value);
+            speedRatio = 1 / speedFactor;
+            
+            // CSS変数のアニメーション速度係数を更新
+            document.documentElement.style.setProperty('--speed-ratio', speedRatio);
+        });
+
+        // ランダム郵便番号
+        function generateRandomZip() {
+            return `${Math.floor(100 + Math.random() * 900)}${Math.floor(1000 + Math.random() * 9000)}`;
+        }
+
+        // 次の操作を準備 (ステップ固定式に全面改修 - op-indicator処理を除去)
+        function prepareNextOperation() {
+            // 全フォームを初期化
+            formsData.forEach(form => {
+                const accInput = document.getElementById(`accName${form.id}`);
+                const zipInput = document.getElementById(`zipInput${form.id}`);
+                const singleRow = document.getElementById(`singleRow${form.id}`);
+                const multiRow = document.getElementById(`multiRow${form.id}`);
+                
+                if (singleRow && multiRow) {
+                    singleRow.style.display = 'flex';
+                    multiRow.style.display = 'none';
+                }
+                
+                form.op = 'insert';
+                accInput.value = `株式会社${form.preName} ${nextAccountId}`;
+                zipInput.value = generateRandomZip();
+            });
+
+            if (currentStep === 7) {
+                // バッチ処理のステップ時は全フォーム待機中でOK
+                return;
+            }
+
+            // 現在のステップに応じて対象のフォームを決定
+            let targetFormId = 1;
+            if (currentStep === 1 || currentStep === 4) targetFormId = 1;
+            if (currentStep === 2 || currentStep === 5) targetFormId = 2;
+            if (currentStep === 3 || currentStep === 6) targetFormId = 3;
+
+            const form = formsData.find(f => f.id === targetFormId);
+            const accInput = document.getElementById(`accName${targetFormId}`);
+            const zipInput = document.getElementById(`zipInput${targetFormId}`);
+
+            // ステップに応じたアクションのセット
+            if (currentStep <= 3) {
+                form.op = 'insert';
+            } else if (currentStep === 4) {
+                form.op = 'insert';
+                zipInput.value = String(Math.floor(Math.random() * 99999)); // エラー用5桁
+            } else if (currentStep === 5) {
+                form.op = 'update';
+                
+                if (dbRecords.length > 0) {
+                    const targetIndex = Math.floor(Math.random() * dbRecords.length);
+                    form.targetDbIndex = targetIndex;
+                    accInput.value = dbRecords[targetIndex].name.replace(/\(株\)/g, '株式会社');
+                } else {
+                    form.op = 'insert';
+                }
+            } else if (currentStep === 6) {
+                form.op = 'update-multi';
+                
+                const singleRow = document.getElementById('singleRow3');
+                const multiRow = document.getElementById('multiRow3');
+                singleRow.style.display = 'none';
+                multiRow.style.display = 'block';
+
+                if (dbRecords.length >= 3) {
+                    const shuffledIndices = dbRecords.map((_, i) => i).sort(() => 0.5 - Math.random());
+                    const targetIndices = shuffledIndices.slice(0, 3).sort((a,b) => a - b);
+                    form.multiData = targetIndices.map(idx => {
+                        const updateName = dbRecords[idx].name.replace(/\(株\)/g, '株式会社');
+                        return {
+                            targetDbIndex: idx,
+                            name: updateName,
+                            zip: generateRandomZip()
+                        };
+                    });
+                    const tbody = document.getElementById('multiRowBody3');
+                    tbody.innerHTML = '';
+                    form.multiData.forEach(d => {
+                        tbody.innerHTML += `<tr><td>${d.name}</td><td>〒${d.zip}</td></tr>`;
+                    });
+                } else {
+                    form.op = 'insert';
+                    singleRow.style.display = 'flex';
+                    multiRow.style.display = 'none';
+                }
+            }
+        }
+
+        // 次のステップへ進める関数
+        function nextStep() {
+            currentStep++;
+            if (currentStep > 7) currentStep = 1; 
+            prepareNextOperation();
+        }
+
+        // SVGルート線の描画
+        function drawRoutes() {
+            const contRect = container.getBoundingClientRect();
+            const logicRect = logicZone.getBoundingClientRect();
+            const dbRect = dbBox.getBoundingClientRect();
+
+            const centerX = logicRect.left - contRect.left + logicZone.getBoundingClientRect().width / 2;
+            const dbLeft = dbRect.left - contRect.left;
+            
+            const routeInsert = document.getElementById('routeInsert');
+            routeInsert.setAttribute('x1', centerX);
+            routeInsert.setAttribute('x2', centerX);
+            document.getElementById('labelInsert').setAttribute('x', centerX + 10);
+
+            const detourX = centerX + 190; 
+            const endY = dbRect.height / 2; 
+            
+            const pathData = `M ${centerX} 0 L ${detourX} 30 L ${detourX} ${endY + 50} L ${dbLeft + 200} ${endY + 50}`;
+            document.getElementById('routeUpdate').setAttribute('d', pathData);
+            document.getElementById('labelUpdate').setAttribute('x', detourX - 25);
+        }
+        window.addEventListener('resize', drawRoutes);
+        setTimeout(drawRoutes, 60);
+
+        // ==========================================
+        // メール送信アニメーション (速度連動型)
+        // ==========================================
+        function sendMailAnimation(targetX, targetY, onComplete) {
+            const mail = document.createElement('div');
+            mail.innerHTML = `<svg width="1.2em" height="1.2em" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="32" cy="32" r="30" fill="#1589ee" />
+                <path d="M14 22 L50 22 L50 44 L14 44 Z" fill="#ffffff" />
+                <path d="M14 22 L32 36 L50 22" stroke="#1589ee" stroke-width="3" fill="none" />
+            </svg>`;
+            mail.className = 'flying-mail';
+            
+            const afterLogic = document.getElementById('afterLogicBox');
+            const contRect = container.getBoundingClientRect();
+            const alRect = afterLogic.getBoundingClientRect();
+            
+            const startX = alRect.left - contRect.left + alRect.width / 2 - 20;
+            const startY = alRect.top - contRect.top + alRect.height / 2 - 20;
+            
+            mail.style.left = `${startX}px`;
+            mail.style.top = `${startY}px`;
+            mail.style.transform = 'scale(0)';
+            mail.style.opacity = '0';
+            mail.style.transition = `all ${calcTime(200)}ms cubic-bezier(0.25, 1, 0.5, 1)`;
+            
+            container.appendChild(mail);
+            afterLogic.classList.add('active');
+            
+            void mail.offsetWidth; 
+            
+            mail.style.transform = 'scale(1)';
+            mail.style.opacity = '1';
+            
+            setTimeout(() => {
+                mail.style.transition = `left ${calcTime(260)}ms ease-in-out, top ${calcTime(260)}ms ease-in-out`;
+                mail.style.left = `${targetX + 80}px`; 
+                mail.style.top = `${targetY - 10}px`; 
+                
+                setTimeout(() => {
+                    mail.style.transition = `left ${calcTime(330)}ms ease-in, top ${calcTime(330)}ms cubic-bezier(0.55, 0.085, 0.68, 0.53), opacity ${calcTime(330)}ms, transform ${calcTime(330)}ms`;
+                    mail.style.left = `${contRect.width + 100}px`;
+                    mail.style.top = `-100px`;
+                    mail.style.opacity = '0';
+                    mail.style.transform = 'rotate(20deg) scale(1.5)'; 
+                    
+                    setTimeout(() => {
+                        mail.remove();
+                        afterLogic.classList.remove('active');
+                        if (onComplete) onComplete();
+                    }, calcTime(330));
+                }, calcTime(260)); 
+            }, calcTime(130)); 
+        }
+
+        // ==========================================
+        // バッチ処理（夜間0:00）アニメーション (速度連動型)
+        // ==========================================
+        function runBatchAnimation(onComplete) {
+            const indicator = document.getElementById('midnightOverlay');
+            indicator.classList.add('show');
+            
+            setTimeout(() => {
+                const batchBox = document.getElementById('batchLogicBox');
+                const contRect = container.getBoundingClientRect();
+                const batchRect = batchBox.getBoundingClientRect();
+                const endX = batchRect.left - contRect.left + (batchRect.width - RECORD_WIDTH) / 2;
+                const endY = batchRect.top - contRect.top + (batchRect.height - RECORD_HEIGHT) / 2;
+
+                let fetchCompleted = 0;
+                const total = dbRecords.length;
+
+                dbRecords.forEach((targetRec, idx) => {
+                    setTimeout(() => {
+                        const fetchRec = document.createElement('div');
+                        fetchRec.className = 'record-item fetching';
+                        fetchRec.innerHTML = targetRec.elem.innerHTML;
+                        fetchRec.style.borderColor = '#6a1b9a';
+                        fetchRec.style.boxShadow = '0 0 15px rgba(106, 27, 154, 0.6)';
+                        
+                        const badge = fetchRec.querySelector('.rec-badge');
+                        if (badge) {
+                            badge.innerText = 'BATCH';
+                            badge.style.background = '#6a1b9a';
+                        }
+                        
+                        container.appendChild(fetchRec);
+
+                        const startX = targetRec.elem.getBoundingClientRect().left - contRect.left;
+                        const startY = targetRec.elem.getBoundingClientRect().top - contRect.top;
+
+                        fetchRec.style.left = `${startX}px`;
+                        fetchRec.style.top = `${startY}px`;
+                        
+                        void fetchRec.offsetWidth;
+
+                        fetchRec.style.transition = `top ${calcTime(400)}ms ease-out, left ${calcTime(400)}ms ease-in, transform ${calcTime(400)}ms, opacity ${calcTime(400)}ms`;
+                        fetchRec.style.top = `${endY}px`;
+                        fetchRec.style.left = `${endX}px`;
+                        fetchRec.style.transform = 'scale(0.3)';
+                        fetchRec.style.opacity = '0';
+
+                        setTimeout(() => {
+                            fetchRec.remove();
+                            fetchCompleted++;
+                            
+                            if (fetchCompleted === total) {
+                                batchBox.classList.add('active');
+                                
+                                setTimeout(() => {
+                                    batchBox.classList.remove('active');
+                                    
+                                    let updateCompleted = 0;
+                                    dbRecords.forEach((rec) => {
+                                        const oldName = rec.name;
+                                        const newName = oldName.replace(/株式会社/g, '(株)');
+                                        rec.name = newName;
+
+                                        const returnRec = document.createElement('div');
+                                        returnRec.className = `record-item op-update`;
+                                        returnRec.style.borderColor = '#6a1b9a';
+                                        
+                                        const zipText = rec.elem.querySelector('.zipcode').innerText;
+
+                                        returnRec.innerHTML = `
+                                            <span class="rec-badge" style="background:#6a1b9a;">UPD</span>
+                                            <span class="zipcode">${zipText}</span>
+                                            <span class="acc-name">${newName}</span>
+                                        `;
+                                        container.appendChild(returnRec);
+                                        
+                                        returnRec.style.left = `${endX}px`;
+                                        returnRec.style.top = `${endY}px`;
+                                        returnRec.style.transform = 'scale(0.3)';
+                                        returnRec.style.opacity = '0';
+                                        
+                                        void returnRec.offsetWidth;
+
+                                        const targetX = dbBox.getBoundingClientRect().left - contRect.left + (dbBox.getBoundingClientRect().width - RECORD_WIDTH) / 2;
+                                        const targetY = rec.topY;
+
+                                        returnRec.style.transition = `top ${calcTime(400)}ms ease-in, left ${calcTime(400)}ms ease-out, transform ${calcTime(400)}ms, opacity ${calcTime(400)}ms`;
+                                        returnRec.style.top = `${targetY}px`;
+                                        returnRec.style.left = `${targetX}px`;
+                                        returnRec.style.transform = 'scale(1)';
+                                        returnRec.style.opacity = '1';
+
+                                        setTimeout(() => {
+                                            rec.elem.querySelector('.acc-name').innerText = newName;
+                                            rec.elem.classList.remove('db-updated');
+                                            void rec.elem.offsetWidth; 
+                                            rec.elem.style.animation = 'none';
+                                            rec.elem.style.backgroundColor = '#fdf6ff';
+                                            rec.elem.style.borderColor = '#6a1b9a';
+                                            setTimeout(() => {
+                                                rec.elem.style.backgroundColor = 'white';
+                                                rec.elem.style.borderColor = '#d8dde6';
+                                            }, calcTime(400));
+
+                                            returnRec.remove();
+                                            
+                                            updateCompleted++;
+                                            if (updateCompleted === total) {
+                                                indicator.classList.remove('show');
+                                                onComplete();
+                                            }
+                                        }, calcTime(400));
+                                    });
+                                }, 450); 
+                            }
+                        }, calcTime(400)); 
+                    }, idx * 30); 
+                });
+
+            }, calcTime(530)); 
+        }
+
+        // ==========================================
+        // DBからの既存レコードフェッチアニメーション (速度連動型)
+        // ==========================================
+        function fetchFromDB(targetIndices, targetFormId, onComplete) {
+            if (!targetIndices || targetIndices.length === 0) {
+                onComplete();
+                return;
+            }
+
+            const outletElem = document.getElementById(`outlet${targetFormId}`);
+            const contRect = container.getBoundingClientRect();
+            const endX = outletElem.getBoundingClientRect().left - contRect.left + (outletElem.getBoundingClientRect().width - RECORD_WIDTH) / 2;
+            const endY = outletElem.getBoundingClientRect().top - contRect.top - 20; 
+
+            let completed = 0;
+            const total = targetIndices.length;
+
+            targetIndices.forEach((dbIndex, idx) => {
+                const targetRec = dbRecords[dbIndex];
+                if (!targetRec) {
+                    completed++;
+                    if (completed === total) onComplete();
+                    return;
+                }
+
+                setTimeout(() => {
+                    const fetchRec = document.createElement('div');
+                    fetchRec.className = 'record-item fetching';
+                    fetchRec.innerHTML = targetRec.elem.innerHTML;
+                    
+                    const badge = fetchRec.querySelector('.rec-badge');
+                    if (badge) {
+                        badge.innerText = 'READ';
+                        badge.style.background = '#706e6b';
+                    }
+                    
+                    container.appendChild(fetchRec);
+
+                    const startX = targetRec.elem.getBoundingClientRect().left - contRect.left;
+                    const startY = targetRec.elem.getBoundingClientRect().top - contRect.top;
+
+                    fetchRec.style.left = `${startX}px`;
+                    fetchRec.style.top = `${startY}px`;
+                    
+                    void fetchRec.offsetWidth; 
+
+                    setTimeout(() => {
+                        fetchRec.style.transition = `transform ${calcTime(130)}ms ease-out, box-shadow ${calcTime(130)}ms`;
+                        fetchRec.style.transform = 'scale(1.1) translateY(-10px)';
+                        fetchRec.style.boxShadow = '0 10px 20px rgba(226, 135, 5, 0.8)';
+                        
+                        setTimeout(() => {
+                            fetchRec.style.transition = `top ${calcTime(400)}ms ease-out, left ${calcTime(400)}ms ease-in, transform ${calcTime(400)}ms, opacity ${calcTime(400)}ms`;
+                            fetchRec.style.top = `${endY}px`;
+                            fetchRec.style.left = `${endX}px`;
+                            fetchRec.style.transform = 'scale(0.8)';
+                            fetchRec.style.opacity = '0';
+
+                            setTimeout(() => {
+                                fetchRec.remove();
+                                completed++;
+                                if (completed === total) {
+                                    const cardElem = document.getElementById(`form${targetFormId}`);
+                                    const originalShadow = cardElem.style.boxShadow;
+                                    cardElem.style.transition = `box-shadow ${calcTime(130)}ms`;
+                                    cardElem.style.boxShadow = '0 0 30px rgba(226, 135, 5, 1)'; 
+                                    
+                                    setTimeout(() => {
+                                        cardElem.style.boxShadow = originalShadow;
+                                        setTimeout(() => {
+                                            cardElem.style.transition = '';
+                                            onComplete();
+                                        }, calcTime(130));
+                                    }, calcTime(130));
+                                }
+                            }, calcTime(400)); 
+                        }, calcTime(200)); 
+                    }, calcTime(30)); 
+
+                }, idx * calcTime(160)); 
+            });
+        }
+
+        // ==========================================
+        // 個別成功トースト表示 (速度連動型)
+        // ==========================================
+        function showFormSuccess(formId, msg, onComplete) {
+            const successElem = document.getElementById(`formSuccess${formId}`);
+            if(successElem) {
+                successElem.innerText = msg;
+                successElem.classList.add('show');
+                
+                // 表示持続時間を取得速度設定に合わせて可変
+                const duration = calcTime(800);
+                
+                setTimeout(() => {
+                    successElem.classList.remove('show');
+                    // トランジション(0.3sベース)完了後に次の処理を開始
+                    setTimeout(() => {
+                        if (onComplete) onComplete();
+                    }, calcTime(300));
+                }, duration);
+            } else {
+                if (onComplete) onComplete();
+            }
+        }
+
+        // ==========================================
+        // 個別エラー表示 (速度連動型)
+        // ==========================================
+        function showFormError(formId, msg, onComplete) {
+            const errElem = document.getElementById(`formErr${formId}`);
+            if(errElem) {
+                errElem.innerText = msg;
+                errElem.classList.add('show');
+                const card = document.getElementById(`form${formId}`);
+                card.classList.add('shake');
+                setTimeout(() => card.classList.remove('shake'), calcTime(200));
+                
+                // 表示持続時間を取得速度設定に合わせて可変
+                const duration = calcTime(800);
+                
+                setTimeout(() => {
+                    errElem.classList.remove('show');
+                    // トランジション(0.3sベース)完了後に次の処理を開始
+                    setTimeout(() => {
+                        if (onComplete) onComplete();
+                    }, calcTime(300));
+                }, duration);
+            } else {
+                if (onComplete) onComplete();
+            }
+        }
+
+        // ==========================================
+        // 1件登録・更新用アニメーション (速度連動型)
+        // ==========================================
+        function runSingleAnimation(operation, zipStr, accName, formId, targetDbIndex, onComplete) {
+            const outletElem = document.getElementById(`outlet${formId}`);
+            
+            if (operation === 'insert') nextAccountId++;
+
+            const cardElem = document.getElementById(`form${formId}`);
+            cardElem.style.transform = 'scale(1.02)';
+            cardElem.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
+            setTimeout(() => {
+                cardElem.style.transform = 'none';
+                cardElem.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+            }, calcTime(100));
+
+            const record = document.createElement('div');
+            record.className = `record-item op-${operation}`;
+            const badgeText = operation === 'insert' ? 'INS' : 'UPD';
+            record.innerHTML = `
+                <span class="rec-badge">${badgeText}</span>
+                <span class="zipcode">〒${zipStr}</span>
+                <span class="acc-name">${accName}</span>
+            `;
+            container.appendChild(record);
+
+            const contRect = container.getBoundingClientRect();
+            const outletRect = outletElem.getBoundingClientRect();
+            const logicRect = logicZone.getBoundingClientRect();
+            const dbRect = dbBox.getBoundingClientRect();
+
+            const startX = outletRect.left - contRect.left + (outletRect.width - RECORD_WIDTH) / 2;
+            const startY = outletRect.bottom - contRect.top;
+            const midX = logicRect.left - contRect.left + (logicRect.width - RECORD_WIDTH) / 2;
+            const midY = logicRect.top - contRect.top + (logicRect.height - RECORD_HEIGHT) / 2;
+
+            record.style.left = `${startX}px`;
+            record.style.top = `${startY}px`;
+            record.offsetHeight;
+
+            // フェーズ1: 落下
+            record.style.transition = `top ${calcTime(260)}ms ease-in, left ${calcTime(260)}ms ease-in-out`;
+            record.style.top = `${midY}px`;
+            record.style.left = `${midX}px`;
+
+            setTimeout(() => {
+                // フェーズ2: ロジック処理
+                
+                let cleanZip = zipStr.replace(/-/g, '').trim();
+                const isLengthError = operation === 'insert' && cleanZip.length < 7;
+
+                if (isLengthError) {
+                    // --- エラー時（跳ね返り）ルート ---
+                    logicMachine.classList.add('error');
+                    
+                    setTimeout(() => {
+                        record.className = 'record-item op-error';
+                        record.innerHTML = `
+                            <span class="rec-badge">ERR</span>
+                            <span class="zipcode">〒${zipStr}</span>
+                            <span class="acc-name">${accName}</span>
+                        `;
+                        
+                        setTimeout(() => {
+                            logicMachine.classList.remove('error');
+                            record.style.transition = `top ${calcTime(200)}ms ease-out, left ${calcTime(200)}ms ease-out`;
+                            record.style.top = `${startY}px`;
+                            record.style.left = `${startX}px`;
+                            
+                            setTimeout(() => {
+                                record.remove();
+                                showFormError(formId, '郵便番号桁数不足', onComplete);
+                            }, calcTime(200));
+                        }, calcTime(200));
+                    }, calcTime(100));
+
+                } else {
+                    // --- 正常ルート ---
+                    logicMachine.classList.add('active');
+                    
+                    setTimeout(() => {
+                        cleanZip = cleanZip.padEnd(7, '0').substring(0, 7);
+                        const formattedZip = cleanZip.substring(0, 3) + '-' + cleanZip.substring(3);
+                        
+                        record.querySelector('.zipcode').innerText = `〒${formattedZip}`;
+                        record.classList.add('processed');
+                        setTimeout(() => logicMachine.classList.remove('active'), calcTime(100));
+
+                        // フェーズ3: DB層へ
+                        setTimeout(() => {
+                            if (operation === 'insert') {
+                                const endX = dbRect.left - contRect.left + (dbRect.width - RECORD_WIDTH) / 2;
+                                
+                                if (dbRecords.length < MAX_CAPACITY) {
+                                    const endY = dbRect.top - contRect.top + dbRect.height - ((dbRecords.length + 1) * (RECORD_HEIGHT + RECORD_MARGIN)) - 10;
+                                    
+                                    record.style.transition = `top ${calcTime(200)}ms cubic-bezier(0.55, 0.085, 0.68, 0.53), left ${calcTime(200)}ms ease-in-out`;
+                                    record.style.top = `${endY}px`;
+                                    record.style.left = `${endX}px`;
+
+                                    setTimeout(() => {
+                                        dbRecords.push({ id: nextAccountId - 1, name: accName, elem: record, topY: endY });
+                                        record.style.transition = `top ${calcTime(50)}ms ease-out`;
+                                        record.style.top = `${endY - 3}px`;
+                                        setTimeout(() => {
+                                            record.style.transition = `top ${calcTime(50)}ms ease-in`;
+                                            record.style.top = `${endY}px`;
+                                            
+                                            // レコード保存完了後、メール送信アニメーション発火
+                                            sendMailAnimation(endX, endY, () => {
+                                                showFormSuccess(formId, '新規作成完了', onComplete);
+                                            });
+                                        }, calcTime(50));
+                                    }, calcTime(200));
+                                } else {
+                                    const crashY = dbRect.top - contRect.top - 15;
+                                    record.style.transition = `top ${calcTime(150)}ms ease-in, left ${calcTime(150)}ms ease-in-out`;
+                                    record.style.top = `${crashY}px`;
+                                    record.style.left = `${endX}px`;
+
+                                    setTimeout(() => {
+                                        record.style.borderColor = '#c23934';
+                                        const dir = Math.random() > 0.5 ? 1 : -1;
+                                        record.style.transition = `left ${calcTime(250)}ms linear, top ${calcTime(250)}ms cubic-bezier(0.55, 0.085, 0.68, 0.53), transform ${calcTime(250)}ms linear, opacity ${calcTime(200)}ms ease-in ${calcTime(50)}ms`;
+                                        record.style.left = `${endX + (dir * 120)}px`;
+                                        record.style.top = `${crashY + 300}px`;
+                                        record.style.transform = `rotate(${dir * 60}deg)`;
+                                        record.style.opacity = '0';
+
+                                        dbBox.classList.add('shake');
+                                        setTimeout(() => dbBox.classList.remove('shake'), calcTime(150));
+                                        toast.classList.add('show');
+                                        setTimeout(() => toast.classList.remove('show'), calcTime(1800));
+
+                                        setTimeout(() => {
+                                            record.remove();
+                                            onComplete();
+                                        }, calcTime(250));
+                                    }, calcTime(150));
+                                }
+                            } else {
+                                // Update
+                                const targetRec = dbRecords[targetDbIndex];
+                                if (!targetRec) { record.remove(); onComplete(); return; }
+                                const endX = dbRect.left - contRect.left + (dbRect.width - RECORD_WIDTH) / 2;
+                                const endY = targetRec.topY; 
+                                const detourX = midX + 190; 
+
+                                record.style.transition = `left ${calcTime(150)}ms ease-in-out`;
+                                record.style.left = `${detourX}px`;
+
+                                setTimeout(() => {
+                                    record.style.transition = `top ${calcTime(150)}ms ease-in-out`;
+                                    record.style.top = `${endY}px`;
+
+                                    setTimeout(() => {
+                                        record.style.transition = `left ${calcTime(150)}ms cubic-bezier(0.25, 1, 0.5, 1)`;
+                                        record.style.left = `${endX}px`;
+
+                                        setTimeout(() => {
+                                            targetRec.name = accName; 
+                                            targetRec.elem.querySelector('.acc-name').innerText = accName;
+                                            targetRec.elem.querySelector('.zipcode').innerText = `〒${formattedZip}`;
+                                            targetRec.elem.classList.remove('db-updated');
+                                            void targetRec.elem.offsetWidth; 
+                                            targetRec.elem.classList.add('db-updated');
+
+                                            record.remove();
+                                            
+                                            // レコード更新完了後、メール送信アニメーション発火
+                                            sendMailAnimation(endX, endY, () => {
+                                                showFormSuccess(formId, '更新完了', onComplete);
+                                            });
+                                        }, calcTime(150));
+                                    }, calcTime(150));
+                                }, calcTime(150));
+                            }
+                        }, calcTime(200)); 
+                    }, calcTime(100)); 
+                }
+            }, calcTime(200));
+        }
+
+        // ==========================================
+        // Bulk更新(複数件)アニメーション (速度連動型)
+        // ==========================================
+        function startMultiAnimation(formObj, targetFormId, onComplete) {
+            const outletElem = document.getElementById(`outlet${targetFormId}`);
+            
+            // フォームを光らせる(送信時の表現)
+            const cardElem = document.getElementById(`form${targetFormId}`);
+            cardElem.style.transform = 'scale(1.02)';
+            cardElem.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
+            setTimeout(() => {
+                cardElem.style.transform = 'none';
+                cardElem.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+            }, calcTime(100));
+
+            // Bulkコンテナ(3件の塊)生成
+            const bulk = document.createElement('div');
+            bulk.className = 'record-bulk op-update';
+            let innerHTML = '<div class="record-bulk-header">Bulk Update (3件一括処理)</div>';
+            formObj.multiData.forEach(d => {
+                innerHTML += `
+                    <div class="record-bulk-item">
+                        <span class="zipcode">〒${d.zip}</span>
+                        <span class="acc-name">${d.name}</span>
+                    </div>
+                `;
+            });
+            bulk.innerHTML = innerHTML;
+            container.appendChild(bulk);
+
+            const contRect = container.getBoundingClientRect();
+            const outletRect = outletElem.getBoundingClientRect();
+            const logicRect = logicZone.getBoundingClientRect();
+            const dbRect = dbBox.getBoundingClientRect();
+
+            const startX = outletRect.left - contRect.left + (outletRect.width - 190) / 2;
+            const startY = outletRect.bottom - contRect.top;
+            const midX = logicRect.left - contRect.left + (logicRect.width - 190) / 2;
+            const midY = logicRect.top - contRect.top + (logicRect.height - 80) / 2; 
+
+            bulk.style.left = `${startX}px`;
+            bulk.style.top = `${startY}px`;
+            bulk.offsetHeight; 
+
+            // フェーズ1: 塊として落下
+            bulk.style.transition = `top ${calcTime(200)}ms ease-in, left ${calcTime(200)}ms ease-in-out`;
+            bulk.style.top = `${midY}px`;
+            bulk.style.left = `${midX}px`;
+
+            setTimeout(() => {
+                logicMachine.classList.add('active');
+                setTimeout(() => {
+                    bulk.querySelectorAll('.zipcode').forEach((el, i) => {
+                        let cleanZip = formObj.multiData[i].zip.replace(/-/g, '').padEnd(7, '0').substring(0, 7);
+                        el.innerText = `〒${cleanZip.substring(0,3)}-${cleanZip.substring(3)}`;
+                    });
+                    bulk.classList.add('processed');
+                    setTimeout(() => logicMachine.classList.remove('active'), calcTime(100));
+
+                    setTimeout(() => {
+                        bulk.remove();
+                        // フェーズ3: DBへ分裂して発射
+                        let completed = 0;
+                        const total = formObj.multiData.length;
+                        
+                        formObj.multiData.forEach((data, index) => {
+                            const targetRec = dbRecords[data.targetDbIndex];
+                            if (!targetRec) {
+                                completed++;
+                                if(completed === total) { onComplete(); }
+                                return;
+                            }
+
+                            const record = document.createElement('div');
+                            record.className = `record-item op-update`;
+                            let cleanZip = data.zip.replace(/-/g, '').padEnd(7, '0').substring(0, 7);
+                            const formattedZip = `${cleanZip.substring(0,3)}-${cleanZip.substring(3)}`;
+                            record.innerHTML = `
+                                <span class="rec-badge">UPD</span>
+                                <span class="zipcode" style="color:#04844b;">〒${formattedZip}</span>
+                                <span class="acc-name">${data.name}</span>
+                            `;
+                            container.appendChild(record);
+                            
+                            record.style.left = `${midX}px`; 
+                            record.style.top = `${midY + index * 10}px`; 
+                            record.offsetHeight;
+
+                            const endX = dbRect.left - contRect.left + (dbRect.width - RECORD_WIDTH) / 2;
+                            const endY = targetRec.topY;
+                            const detourX = midX + 190 + (index * 15); 
+
+                            record.style.transition = `left ${calcTime(150)}ms ease-out`;
+                            record.style.left = `${detourX}px`;
+
+                            setTimeout(() => {
+                                record.style.transition = `top ${calcTime(150)}ms ease-in-out`;
+                                record.style.top = `${endY}px`;
+                                setTimeout(() => {
+                                    record.style.transition = `left ${calcTime(150)}ms cubic-bezier(0.25, 1, 0.5, 1)`;
+                                    record.style.left = `${endX}px`;
+                                    setTimeout(() => {
+                                        targetRec.name = data.name; 
+                                        targetRec.elem.querySelector('.acc-name').innerText = data.name;
+                                        targetRec.elem.querySelector('.zipcode').innerText = `〒${formattedZip}`;
+                                        targetRec.elem.classList.remove('db-updated');
+                                        void targetRec.elem.offsetWidth; 
+                                        targetRec.elem.classList.add('db-updated');
+                                        record.remove();
+                                        
+                                        // Bulkの各レコード更新完了後にそれぞれメールを飛ばす
+                                        sendMailAnimation(endX, endY, () => {
+                                            completed++;
+                                            if (completed === total) {
+                                                onComplete();
+                                            }
+                                        });
+                                    }, calcTime(150)); 
+                                }, calcTime(150));
+                            }, calcTime(150));
+                        });
+
+                    }, calcTime(260)); 
+                }, calcTime(200)); 
+            }, calcTime(260)); 
+        }
+
+        // ==========================================
+        // 自律自動実行用の次トリガーハンドラー
+        // ==========================================
+        function triggerNextAutoRun() {
+            if (!isAutoRunning) return;
+            // 完全にトースト・サクセス表示が消え去った後、お好みの余韻時間を置いて自動開始
+            autoTimeout = setTimeout(() => {
+                if (isAutoRunning && !isAnimating) {
+                    processRecord();
+                }
+            }, calcTime(500)); // 1.5倍速時=330ms, 等倍速時=500ms, 0.75倍速時=670ms
+        }
+
+        // ==========================================
+        // メイン処理呼出
+        // ==========================================
+        function processRecord() {
+            if (isAnimating) return;
+            isAnimating = true;
+
+            // ステップ7: バッチ処理の発動
+            if (currentStep === 7) {
+                runBatchAnimation(() => {
+                    isAnimating = false;
+                    nextStep();
+                    if (isAutoRunning) {
+                        triggerNextAutoRun();
+                    }
+                });
+                return;
+            }
+
+            // 現在のステップに応じたフォームを特定
+            let targetFormId = 1;
+            if (currentStep === 1 || currentStep === 4) targetFormId = 1;
+            if (currentStep === 2 || currentStep === 5) targetFormId = 2;
+            if (currentStep === 3 || currentStep === 6) targetFormId = 3;
+
+            const formObj = formsData.find(f => f.id === targetFormId);
+
+            // インジケーター表示
+            const indElem = document.getElementById(`actionInd${targetFormId}`);
+            const overlayElem = document.getElementById(`actionOverlay${targetFormId}`);
+            const titleElem = document.getElementById(`actionTitle${targetFormId}`);
+            const descElem = document.getElementById(`actionDesc${targetFormId}`);
+            
+            indElem.className = `form-action-indicator ${formObj.op}`;
+            if (formObj.op === 'insert') {
+                titleElem.innerText = '✨ 新規登録';
+                descElem.innerText = 'レコード作成処理を実行中...';
+            } else if (formObj.op === 'update') {
+                titleElem.innerText = '🔄 既存更新';
+                descElem.innerText = '既存レコードを更新中...';
+            } else if (formObj.op === 'update-multi') {
+                titleElem.innerText = '📑 一括更新';
+                descElem.innerText = '3件 of レコードを同時更新中...';
+            }
+            indElem.classList.add('show');
+            overlayElem.classList.add('show');
+
+            // 処理完了時のコールバック定義 (自律トリガーを呼ぶ)
+            const finishOperation = () => {
+                indElem.classList.remove('show');
+                overlayElem.classList.remove('show');
+                isAnimating = false;
+                nextStep(); 
+                
+                if (isAutoRunning) {
+                    triggerNextAutoRun();
+                }
+            };
+
+            // Fetch(取得)が必要なターゲットのインデックス配列を作成
+            let fetchIndices = [];
+            if (formObj.op === 'update') {
+                fetchIndices = [formObj.targetDbIndex];
+            } else if (formObj.op === 'update-multi') {
+                fetchIndices = formObj.multiData.map(d => d.targetDbIndex);
+            }
+
+            // まずDBからレコードを取得するアニメーションを実行
+            fetchFromDB(fetchIndices, targetFormId, () => {
+                // 取得完了後、既存の送出アニメーションを開始
+                if (formObj.op === 'update-multi') {
+                    startMultiAnimation(formObj, targetFormId, finishOperation);
+                } else {
+                    const zipStr = document.getElementById(`zipInput${targetFormId}`).value;
+                    const accName = document.getElementById(`accName${targetFormId}`).value;
+                    runSingleAnimation(formObj.op, zipStr, accName, targetFormId, formObj.targetDbIndex, finishOperation);
+                }
+            });
+        }
+
+        // イベント制御
+        submitBtn.addEventListener('click', () => {
+            if(isAutoRunning || isAnimating) return;
+            processRecord();
+        });
+
+        autoBtn.addEventListener('click', () => {
+            if (isAutoRunning) {
+                isAutoRunning = false;
+                clearTimeout(autoTimeout);
+                autoBtn.innerText = '▶ 自動実行';
+                autoBtn.className = 'btn-global success';
+                submitBtn.disabled = false;
+            } else {
+                isAutoRunning = true;
+                autoBtn.innerText = '■ 停止';
+                autoBtn.className = 'btn-global danger';
+                submitBtn.disabled = true;
+                
+                processRecord();
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            dbRecords.forEach(rec => rec.elem.remove());
+            dbRecords = [];
+            nextAccountId = 1;
+            currentStep = 1; 
+            document.querySelectorAll('.record-item').forEach(r => r.remove());
+            document.querySelectorAll('.record-bulk').forEach(r => r.remove());
+            
+            isAnimating = false;
+            toast.classList.remove('show');
+
+            // インジケーターのクリア
+            [1, 2, 3].forEach(id => {
+                const ind = document.getElementById(`actionInd${id}`);
+                const over = document.getElementById(`actionOverlay${id}`);
+                const successBar = document.getElementById(`formSuccess${id}`);
+                if(ind) ind.classList.remove('show');
+                if(over) over.classList.remove('show');
+                if(successBar) successBar.classList.remove('show');
+            });
+            
+            if (isAutoRunning) {
+                isAutoRunning = false;
+                clearTimeout(autoTimeout);
+                autoBtn.innerText = '▶ 自動実行';
+                autoBtn.className = 'btn-global success';
+                submitBtn.disabled = false;
+            }
+            prepareNextOperation();
+        });
+
+        // 初期化
+        prepareNextOperation();
+
+    </script>
+</body>
+</html>
