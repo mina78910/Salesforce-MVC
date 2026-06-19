@@ -321,8 +321,7 @@
         .batch-logic-wrapper {
             position: absolute;
             right: 50px;
-            top: 50%;
-            transform: translateY(-50%);
+            bottom: 120px; /* Afterロジック層と上下を入れ替え、DB層側へ配置 */
             width: 220px;
             height: 70px;
             background: #2b2826;
@@ -464,7 +463,8 @@
         .after-logic-wrapper {
             position: absolute;
             right: 50px;
-            bottom: 120px; /* 位置を下げてDBと水平くらいに */
+            top: 50%;
+            transform: translateY(-50%); /* beforeイベントの近くに配置 */
             width: 220px;
             height: 70px;
             background: #2b2826;
@@ -942,8 +942,9 @@
             .form-card { width: 250px; padding: 12px; }
             .tier-label { left: 12px; font-size: 12px; }
             .info-bubble { width: 285px; bottom: 12px; left: 12px; padding: 10px 12px; }
-            .batch-logic-wrapper, .after-logic-wrapper { right: 28px; transform: translateY(-50%) scale(0.92); transform-origin: right center; }
-            .after-logic-wrapper { transform: scale(0.92); transform-origin: right bottom; }
+            .batch-logic-wrapper, .after-logic-wrapper { right: 28px; }
+            .after-logic-wrapper { transform: translateY(-50%) scale(0.92); transform-origin: right center; }
+            .batch-logic-wrapper { transform: scale(0.92); transform-origin: right bottom; }
         }
     </style>
 </head>
@@ -1134,13 +1135,19 @@
                 </div>
             </div>
 
-            <!-- バッチ処理層 -->
-            <div class="batch-logic-wrapper" id="batchLogicBox">
-                <div class="batch-logic-title">ロジック 層 (apexバッチ / スケジュールフロー)</div>
-                <div class="batch-logic-flash"></div>
-                <div class="batch-logic-content">
-                    <span class="batch-icon-display">🕒</span>
-                    <span>「株式会社」を<br>「(株)」へ一括変換</span>
+            <!-- Afterロジック層（beforeイベントの近くへ配置） -->
+            <div class="after-logic-wrapper" id="afterLogicBox">
+                <div class="after-logic-title">ロジック 層 (Apexトリガ / レコードトリガフロー)<br>※after イベント</div>
+                <div class="after-logic-flash"></div>
+                <div class="after-logic-content">
+                    <span class="mail-icon-display">
+                        <svg width="1.2em" height="1.2em" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="32" cy="32" r="30" fill="#1589ee"/>
+                            <path d="M14 22 L50 22 L50 44 L14 44 Z" fill="#ffffff"/>
+                            <path d="M14 22 L32 36 L50 22" stroke="#1589ee" stroke-width="3" fill="none"/>
+                        </svg>
+                    </span>
+                    <span>営業担当へ<br>メール通知処理</span>
                 </div>
             </div>
         </div>
@@ -1173,19 +1180,13 @@
                 </div>
             </div>
 
-            <!-- Afterロジック層をデータベース層の中に移動 (位置を下げて水平に) -->
-            <div class="after-logic-wrapper" id="afterLogicBox">
-                <div class="after-logic-title">ロジック 層 (Apexトリガ / レコードトリガフロー)<br>※after イベント</div>
-                <div class="after-logic-flash"></div>
-                <div class="after-logic-content">
-                    <span class="mail-icon-display">
-                        <svg width="1.2em" height="1.2em" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="32" cy="32" r="30" fill="#1589ee"/>
-                            <path d="M14 22 L50 22 L50 44 L14 44 Z" fill="#ffffff"/>
-                            <path d="M14 22 L32 36 L50 22" stroke="#1589ee" stroke-width="3" fill="none"/>
-                        </svg>
-                    </span>
-                    <span>営業担当へ<br>メール通知処理</span>
+            <!-- バッチ処理層（Afterロジック層と上下を入れ替え） -->
+            <div class="batch-logic-wrapper" id="batchLogicBox">
+                <div class="batch-logic-title">ロジック 層 (apexバッチ / スケジュールフロー)</div>
+                <div class="batch-logic-flash"></div>
+                <div class="batch-logic-content">
+                    <span class="batch-icon-display">🕒</span>
+                    <span>「株式会社」を<br>「(株)」へ一括変換</span>
                 </div>
             </div>
 
