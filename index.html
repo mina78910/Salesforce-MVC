@@ -1007,152 +1007,300 @@
             .batch-logic-wrapper { transform: scale(0.92); transform-origin: right bottom; }
         }
 
-        /* スマホ向け: 3層を縦積みにし、絶対配置の補助要素でレコードや説明が重ならないようにする */
+        /* スマホ向け: 俯瞰図の位置関係は崩さず、各パーツを最小サイズに圧縮して表示する */
         @media (max-width: 720px) {
             body {
-                overflow: auto;
+                overflow: hidden;
                 background: #eef4fb;
             }
             .header {
-                position: sticky;
-                top: 0;
-                flex-direction: column;
-                align-items: stretch;
-                gap: 10px;
-                padding: 10px 12px;
+                padding: 6px 8px;
+                gap: 6px;
+                flex-wrap: wrap;
             }
             .header-title {
+                flex: 1 1 100%;
                 justify-content: center;
-                font-size: 14px;
-                line-height: 1.35;
+                font-size: 12px;
+                line-height: 1.25;
                 text-align: center;
+            }
+            .header-title svg {
+                width: 18px;
+                height: 12px;
+                margin-right: 6px;
             }
             .global-controls {
-                justify-content: center;
-                flex-wrap: wrap;
-                gap: 8px;
-            }
-            .speed-selector-container {
-                order: 3;
                 width: 100%;
                 justify-content: center;
+                flex-wrap: nowrap;
+                gap: 4px;
+            }
+            .speed-selector-container {
+                gap: 3px;
+                padding: 3px 6px;
+            }
+            .speed-selector-container span,
+            .speed-selector-container select {
+                font-size: 10px;
             }
             .btn-global {
-                min-height: 38px;
-                padding: 8px 14px;
+                padding: 5px 8px;
+                font-size: 11px;
+                min-height: 28px;
             }
             .architecture-container {
-                height: auto;
-                min-height: calc(100vh - 120px);
-                overflow: visible;
-            }
-            .tier {
-                min-height: auto;
-                padding: 54px 12px 28px;
+                height: calc(100vh - 86px);
+                min-height: 520px;
+                overflow: hidden;
             }
             .tier-label {
-                left: 12px;
-                right: 12px;
-                top: 12px;
-                width: auto;
-                text-align: center;
+                left: 6px;
+                top: 5px;
+                max-width: 44vw;
+                padding: 3px 7px;
+                font-size: 9px;
+                line-height: 1.2;
                 white-space: normal;
-                line-height: 1.35;
             }
-            .tier-ui,
-            .tier-logic,
-            .tier-db {
-                flex: none;
+            .tier-db .tier-label {
+                left: 6px;
+                top: -10px;
+            }
+            .tier-ui {
+                flex: 1.15;
+                padding-top: 24px;
             }
             .forms-wrapper {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 32px;
-                padding: 0;
+                flex-direction: row;
+                align-items: center;
+                gap: 5px;
+                padding: 0 5px;
             }
             .form-card {
-                width: min(100%, 360px);
-                margin: 0 auto;
-                box-sizing: border-box;
+                width: calc((100vw - 20px) / 3);
+                min-width: 0;
+                padding: 6px;
+                border-radius: 8px;
+                border-top-width: 3px;
+            }
+            .user-avatar {
+                top: -16px;
+                width: 30px;
+                height: 30px;
+            }
+            .user-avatar svg {
+                width: 30px;
+                height: 30px;
+            }
+            .form-header {
+                gap: 2px;
+                padding-bottom: 4px;
+                margin-bottom: 5px;
+                align-items: flex-start;
+                flex-direction: column;
+            }
+            .user-badge {
+                font-size: 9px;
+                gap: 2px;
+                white-space: nowrap;
+            }
+            .page-type-badge {
+                font-size: 8px;
+                padding: 1px 5px;
+            }
+            .form-row {
+                gap: 3px;
+                margin-bottom: 0;
+            }
+            .input-group label {
+                font-size: 8px;
+                margin-bottom: 1px;
+            }
+            .input-group input {
+                padding: 3px;
+                font-size: 9px;
+                height: 20px;
+            }
+            .list-view-container {
+                margin-bottom: 0;
+            }
+            .list-view-table {
+                font-size: 8px;
             }
             .list-view-table th,
             .list-view-table td {
-                padding: 6px;
-                font-size: 10px;
+                padding: 2px 3px;
+                max-width: 48px;
             }
             .tier-logic {
-                gap: 26px;
-                flex-direction: column;
+                flex: 0.68;
             }
             .logic-machine {
-                width: min(100%, 300px);
-                max-width: calc(100vw - 32px);
+                width: 168px;
+                height: 46px;
+                border-radius: 9px;
             }
-            .after-logic-wrapper,
-            .batch-logic-wrapper,
-            .midnight-indicator,
-            .info-bubble {
-                position: relative;
-                right: auto;
-                left: auto;
-                top: auto;
-                bottom: auto;
-                transform: none;
+            .logic-machine::before,
+            .logic-machine::after {
+                width: 34px;
             }
-            .after-logic-wrapper,
-            .batch-logic-wrapper {
-                width: min(100%, 300px);
-                margin: 28px auto 0;
+            .before-event-title,
+            .logic-title,
+            .after-logic-title,
+            .batch-logic-title {
+                font-size: 9px;
+                padding: 1px 6px;
+                top: -18px;
+                border-radius: 8px;
+                line-height: 1.15;
             }
-            .after-logic-wrapper {
-                order: 2;
+            .logic-title {
+                top: 3px;
+            }
+            .processing-zone {
+                width: 92px;
+                height: 32px;
+            }
+            .gear {
+                font-size: 25px;
+            }
+            .gear2 {
+                font-size: 31px;
             }
             .tier-db {
-                align-items: center;
-                flex-direction: column;
-                gap: 20px;
-                padding-bottom: 30px;
-            }
-            .tier-db .tier-label {
-                top: 12px;
-                left: 12px;
+                flex: 1.35;
+                align-items: flex-end;
+                padding-bottom: 8px;
             }
             .database-wrapper {
-                margin: 0 auto;
-                order: 1;
+                margin-bottom: 8px;
             }
             .database-box {
-                width: 210px;
-                height: 270px;
+                width: 190px;
+                height: 215px;
             }
             .box-back::after,
             .box-front {
-                width: 210px;
+                width: 190px;
+            }
+            .capacity-marks {
+                left: -18px;
+                transform: scale(0.78);
+                transform-origin: right bottom;
+            }
+            .after-logic-wrapper,
+            .batch-logic-wrapper {
+                right: 6px;
+                width: 126px;
+                height: 44px;
+                border-radius: 7px;
+            }
+            .after-logic-wrapper::before,
+            .after-logic-wrapper::after,
+            .batch-logic-wrapper::before,
+            .batch-logic-wrapper::after {
+                width: 22px;
+            }
+            .after-logic-content,
+            .batch-logic-content {
+                width: 80px;
+                height: 30px;
+                gap: 4px;
+                font-size: 8px;
+                line-height: 1.15;
+            }
+            .mail-icon-display,
+            .batch-icon-display {
+                font-size: 18px;
             }
             .batch-logic-wrapper {
-                order: 2;
+                bottom: 72px;
             }
             .midnight-indicator {
-                order: 3;
-                align-items: center;
-                text-align: center;
-                margin: 0 auto;
+                right: 6px;
+                bottom: 126px;
+                transform: translateY(8px) scale(0.72);
+                transform-origin: right bottom;
+            }
+            .midnight-indicator.show {
+                transform: translateY(0) scale(0.72);
             }
             .midnight-text {
-                font-size: 22px;
+                font-size: 18px;
+                margin-bottom: 4px;
+            }
+            .midnight-subtext {
+                font-size: 9px;
+                padding: 4px 8px;
+                max-width: 170px;
             }
             .info-bubble {
-                order: 4;
-                width: min(100%, 360px);
-                box-sizing: border-box;
-                margin: 0 auto;
-                padding: 12px;
+                left: 6px;
+                bottom: 4px;
+                width: 150px;
+                max-height: 138px;
+                overflow: hidden;
+                padding: 6px 7px;
+                border-radius: 8px;
+                font-size: 8px;
+                line-height: 1.25;
             }
-            .route-guide {
+            .info-bubble-title {
+                font-size: 9px;
+                padding-bottom: 2px;
+                margin-bottom: 4px;
+            }
+            .info-bubble-section {
+                margin-bottom: 4px;
+            }
+            .info-bubble-section ul {
+                padding-left: 11px;
+            }
+            .info-bubble-footer {
                 display: none;
             }
+            .record-item {
+                height: 20px;
+                font-size: 9px;
+                padding: 0 4px;
+            }
+            .rec-badge {
+                font-size: 8px;
+                min-width: 20px;
+                margin-right: 4px;
+                padding: 1px 4px;
+            }
+            .record-item .acc-name {
+                font-size: 8px;
+            }
+            .record-bulk {
+                font-size: 8px;
+            }
+            .form-action-indicator {
+                padding: 7px;
+                width: 92%;
+            }
+            .form-action-indicator .action-title {
+                font-size: 10px;
+                margin-bottom: 3px;
+            }
+            .form-action-indicator .action-desc {
+                font-size: 8px;
+            }
+            .form-error-toast,
+            .form-success-toast {
+                padding: 6px 8px;
+                font-size: 9px;
+            }
+            .route-guide {
+                display: block;
+            }
+            .route-label {
+                font-size: 9px;
+            }
             .toast {
-                width: calc(100% - 28px);
+                width: calc(100% - 16px);
                 box-sizing: border-box;
             }
         }
