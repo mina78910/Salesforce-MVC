@@ -271,7 +271,7 @@
             background: #eef2f6;
             background-image: linear-gradient(rgba(255,255,255,0.58), rgba(255,255,255,0.12)), radial-gradient(#d1dbe8 1px, transparent 1px);
             background-size: 20px 20px;
-            z-index: 35; /* DB層より前面に出し、before/afterロジックの文字が隠れないようにする */
+            z-index: 20; /* 背景色がレコードを覆わないよう、アニメーション要素より背面に固定 */
         }
 
         .logic-machine {
@@ -285,6 +285,7 @@
             align-items: center;
             justify-content: center;
             border: 2px solid #54698d;
+            z-index: 40;
         }
         .logic-machine::before, .logic-machine::after {
             content: ''; position: absolute; width: 60px; height: 100%; background: rgba(0,0,0,0.5); top: 0; z-index: 15;
@@ -553,7 +554,7 @@
             padding: 0 6px;
             font-size: 11px;
             color: #16325c;
-            z-index: 25;
+            z-index: 120;
             box-sizing: border-box;
             will-change: transform, top, left;
             justify-content: flex-start;
@@ -589,7 +590,7 @@
             border: 2px dashed #e28705;
             background: #fff8eb;
             box-shadow: 0 0 15px rgba(226, 135, 5, 0.6);
-            z-index: 100;
+            z-index: 180;
             pointer-events: none;
         }
         .record-item.fetching .rec-badge {
@@ -616,7 +617,7 @@
             flex-direction: column;
             gap: 4px;
             padding: 6px;
-            z-index: 25;
+            z-index: 120;
             box-sizing: border-box;
             will-change: transform, top, left;
             justify-content: flex-start;
