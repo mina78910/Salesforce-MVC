@@ -271,7 +271,7 @@
             background: #eef2f6;
             background-image: linear-gradient(rgba(255,255,255,0.58), rgba(255,255,255,0.12)), radial-gradient(#d1dbe8 1px, transparent 1px);
             background-size: 20px 20px;
-            z-index: 20;
+            z-index: 35; /* DB層より前面に出し、before/afterロジックの文字が隠れないようにする */
         }
 
         .logic-machine {
@@ -474,7 +474,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 15;
+            z-index: 80;
             flex-direction: column;
         }
         .after-logic-wrapper::before, .after-logic-wrapper::after {
@@ -839,8 +839,8 @@
         /* 夜中0:00 インジケーター演出 */
         .midnight-indicator {
             position: absolute;
-            right: 40px;
-            top: 25%;
+            right: 50px;
+            bottom: 210px; /* バッチ処理ボックスの近く（右下）に表示 */
             z-index: 200;
             display: flex;
             flex-direction: column;
@@ -943,6 +943,7 @@
             .tier-label { left: 12px; font-size: 12px; }
             .info-bubble { width: 285px; bottom: 12px; left: 12px; padding: 10px 12px; }
             .batch-logic-wrapper, .after-logic-wrapper { right: 28px; }
+            .midnight-indicator { right: 28px; bottom: 190px; }
             .after-logic-wrapper { transform: translateY(-50%) scale(0.92); transform-origin: right center; }
             .batch-logic-wrapper { transform: scale(0.92); transform-origin: right bottom; }
         }
