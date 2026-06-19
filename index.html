@@ -277,19 +277,15 @@
             box-sizing: border-box; font-size: 12px; background: #fbfbfb; pointer-events: none;
         }
         
-        /* データ発射口 */
+        /* データ発射口（アニメーション座標用の不可視アンカー） */
         .form-outlet {
             position: absolute;
-            bottom: -10px;
+            bottom: 0;
             left: 50%;
             transform: translateX(-50%);
-            width: 30px;
-            height: 15px;
-            background: #e0e5ee;
-            border-radius: 0 0 15px 15px;
-            border: 2px solid #c9c7c5;
-            border-top: none;
-            z-index: 5;
+            width: 0;
+            height: 0;
+            pointer-events: none;
         }
 
         /* === 中段: ロジック層 === */
