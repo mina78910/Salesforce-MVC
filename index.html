@@ -9,7 +9,7 @@
         body {
             margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background: #eef2f6;
+            background: radial-gradient(circle at top left, #ffffff 0, #eef4fb 34%, #dfe8f3 100%);
             color: #080707;
             overflow: hidden;
         }
@@ -21,21 +21,23 @@
 
         /* ヘッダー */
         .header {
-            background: #1589ee;
+            background: linear-gradient(135deg, #0b5cab 0%, #1589ee 52%, #38a3ff 100%);
             color: white;
-            padding: 10px 20px;
+            padding: 12px 22px;
             font-size: 16px;
             font-weight: bold;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 28px rgba(8, 7, 7, 0.18);
             position: relative;
             z-index: 100;
         }
         .header-title {
             display: flex;
             align-items: center;
+            letter-spacing: 0.02em;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.18);
         }
         .header-title svg {
             margin-right: 10px;
@@ -52,14 +54,20 @@
             color: white;
             border: 1px solid rgba(255, 255, 255, 0.5);
             padding: 6px 14px;
-            border-radius: 4px;
+            border-radius: 999px;
             cursor: pointer;
             font-size: 13px;
             font-weight: bold;
-            transition: 0.2s;
+            transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
         }
         .btn-global:hover {
             background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 14px rgba(8, 7, 7, 0.18);
+        }
+        .btn-global:focus-visible, .speed-selector-container select:focus-visible {
+            outline: 3px solid rgba(255, 255, 255, 0.75);
+            outline-offset: 2px;
         }
         .btn-global:disabled {
             opacity: 0.5;
@@ -92,8 +100,9 @@
             gap: 6px;
             background: rgba(255, 255, 255, 0.15);
             padding: 4px 10px;
-            border-radius: 4px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
         }
         .speed-selector-container span {
             font-size: 11px;
@@ -120,7 +129,7 @@
         .architecture-container {
             display: flex;
             flex-direction: column;
-            height: calc(100vh - 50px);
+            height: calc(100vh - 56px);
             position: relative;
         }
 
@@ -131,7 +140,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            border-bottom: 2px dashed #c9c7c5;
+            border-bottom: 2px dashed rgba(112, 110, 107, 0.35);
             box-sizing: border-box;
         }
         .tier-label {
@@ -141,10 +150,11 @@
             font-size: 14px;
             font-weight: bold;
             color: #706e6b;
-            background: rgba(255,255,255,0.9);
-            padding: 4px 12px;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            background: rgba(255,255,255,0.92);
+            padding: 5px 13px;
+            border-radius: 999px;
+            border: 1px solid rgba(216, 221, 230, 0.9);
+            box-shadow: 0 6px 18px rgba(22, 50, 92, 0.12);
             z-index: 50;
         }
 
@@ -157,7 +167,7 @@
         /* === 上段: UI層 (画面) === */
         .tier-ui {
             flex: 1.4;
-            background: linear-gradient(to bottom, #ffffff, #f4f6f9);
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,246,249,0.92));
             padding-top: 35px;
             z-index: 30;
         }
@@ -165,7 +175,7 @@
         /* フォーム群のレイアウト */
         .forms-wrapper {
             display: flex;
-            gap: 20px;
+            gap: 24px;
             justify-content: center;
             width: 100%;
             padding: 0 20px;
@@ -175,10 +185,10 @@
         .form-card {
             background: white;
             padding: 15px;
-            border-radius: 6px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-radius: 14px;
+            box-shadow: 0 14px 30px rgba(22, 50, 92, 0.14), 0 2px 6px rgba(8,7,7,0.06);
             width: 280px; /* 3つ並べるため少し細身に */
-            border-top: 4px solid #1589ee;
+            border-top: 5px solid #1589ee;
             display: flex;
             flex-direction: column;
             position: relative;
@@ -259,7 +269,7 @@
         .tier-logic {
             flex: 0.8;
             background: #eef2f6;
-            background-image: radial-gradient(#d8dde6 1px, transparent 1px);
+            background-image: linear-gradient(rgba(255,255,255,0.58), rgba(255,255,255,0.12)), radial-gradient(#d1dbe8 1px, transparent 1px);
             background-size: 20px 20px;
             z-index: 20;
         }
@@ -268,8 +278,8 @@
             background: #2b2826;
             width: 280px;
             height: 70px;
-            border-radius: 8px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2), inset 0 2px 5px rgba(255,255,255,0.2);
+            border-radius: 14px;
+            box-shadow: 0 14px 28px rgba(8,7,7,0.24), inset 0 2px 5px rgba(255,255,255,0.22);
             position: relative;
             display: flex;
             align-items: center;
@@ -377,7 +387,7 @@
         /* === 下段: データベース層 === */
         .tier-db {
             flex: 1.5;
-            background: linear-gradient(to top, #ffffff, #f4f6f9);
+            background: linear-gradient(0deg, rgba(255,255,255,0.98), rgba(244,246,249,0.92));
             border-bottom: none;
             padding-bottom: 20px;
             align-items: flex-end;
@@ -393,7 +403,7 @@
             width: 320px; /* 右側エリアの幅 */
             height: calc(100% + 2px);
             background: #eef2f6;
-            background-image: radial-gradient(#d8dde6 1px, transparent 1px);
+            background-image: linear-gradient(rgba(255,255,255,0.58), rgba(255,255,255,0.12)), radial-gradient(#d1dbe8 1px, transparent 1px);
             background-size: 20px 20px;
             border-left: 2px dashed #c9c7c5;
             z-index: 0;
@@ -536,8 +546,8 @@
             height: 24px;
             background: white;
             border: 1px solid #d8dde6;
-            border-radius: 4px;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+            border-radius: 7px;
+            box-shadow: 0 7px 16px rgba(22, 50, 92, 0.18);
             display: flex;
             align-items: center;
             padding: 0 6px;
@@ -757,7 +767,7 @@
         }
         .form-success-toast::after {
             content: ''; position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
-            border-width: 4px 4px 0; stroke: solid; border-color: #04844b transparent transparent transparent;
+            border-width: 4px 4px 0; border-style: solid; border-color: #04844b transparent transparent transparent;
         }
         .form-success-toast.show {
             opacity: 1;
@@ -872,8 +882,8 @@
             width: 320px;
             background: rgba(255, 255, 255, 0.95);
             border: 1px solid #d8dde6;
-            border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            border-radius: 14px;
+            box-shadow: 0 16px 34px rgba(22, 50, 92, 0.16), 0 2px 8px rgba(8,7,7,0.06);
             padding: 12px 16px;
             z-index: 100;
             font-size: 11px;
@@ -921,6 +931,19 @@
             border-top: 1px solid #e0e5ee;
             padding-top: 4px;
             margin-top: 4px;
+        }
+
+
+        /* リリース前の仕上げ: 小さな画面でも主要要素が潰れにくいように間隔とサイズを調整 */
+        @media (max-width: 1080px), (max-height: 760px) {
+            .header { padding: 9px 14px; font-size: 14px; }
+            .architecture-container { height: calc(100vh - 48px); }
+            .forms-wrapper { gap: 12px; padding: 0 12px; }
+            .form-card { width: 250px; padding: 12px; }
+            .tier-label { left: 12px; font-size: 12px; }
+            .info-bubble { width: 285px; bottom: 12px; left: 12px; padding: 10px 12px; }
+            .batch-logic-wrapper, .after-logic-wrapper { right: 28px; transform: translateY(-50%) scale(0.92); transform-origin: right center; }
+            .after-logic-wrapper { transform: scale(0.92); transform-origin: right bottom; }
         }
     </style>
 </head>
