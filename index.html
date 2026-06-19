@@ -300,9 +300,35 @@
         .logic-machine::before { left: 0; border-radius: 6px 0 0 6px; border-right: 2px dashed #54698d;}
         .logic-machine::after { right: 0; border-radius: 0 6px 6px 0; border-left: 2px dashed #54698d;}
         
+        .before-event-title {
+            position: absolute;
+            top: -25px;
+            color: #16325c;
+            font-size: 13px;
+            font-weight: bold;
+            background: white;
+            padding: 2px 10px;
+            border-radius: 10px;
+            border: 1px solid #d8dde6;
+            z-index: 25;
+            white-space: nowrap;
+        }
+
         .logic-title {
-            position: absolute; top: -25px; color: #16325c; font-size: 13px; font-weight: bold;
-            background: white; padding: 2px 10px; border-radius: 10px; border: 1px solid #d8dde6;
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: bold;
+            background: rgba(22, 50, 92, 0.9);
+            padding: 2px 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            z-index: 25;
+            white-space: nowrap;
         }
         
         .processing-zone {
@@ -478,7 +504,7 @@
 
         .after-logic-title {
             position: absolute;
-            top: -52px; /* 被りを防ぐため1行分（約14px）上へ引き上げ */
+            top: -25px; /* 処理コンポーネントの上部に配置 */
             background: white;
             padding: 4px 10px;
             border-radius: 10px;
@@ -1121,6 +1147,7 @@
         <div class="tier tier-logic" id="tierLogic">
             <div class="tier-label">ロジック 層 (Apexトリガ / レコードトリガフロー)</div>
             <div class="logic-machine" id="logicMachine">
+                <div class="before-event-title">【before】イベント</div>
                 <div class="logic-title">郵便番号 自動フォーマット処理</div>
                 <div class="logic-flash"></div>
                 <div class="processing-zone" id="logicZone">
