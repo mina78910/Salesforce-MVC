@@ -1006,6 +1006,156 @@
             .after-logic-wrapper { transform: translateY(-50%) scale(0.92); transform-origin: right center; }
             .batch-logic-wrapper { transform: scale(0.92); transform-origin: right bottom; }
         }
+
+        /* スマホ向け: 3層を縦積みにし、絶対配置の補助要素でレコードや説明が重ならないようにする */
+        @media (max-width: 720px) {
+            body {
+                overflow: auto;
+                background: #eef4fb;
+            }
+            .header {
+                position: sticky;
+                top: 0;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+                padding: 10px 12px;
+            }
+            .header-title {
+                justify-content: center;
+                font-size: 14px;
+                line-height: 1.35;
+                text-align: center;
+            }
+            .global-controls {
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .speed-selector-container {
+                order: 3;
+                width: 100%;
+                justify-content: center;
+            }
+            .btn-global {
+                min-height: 38px;
+                padding: 8px 14px;
+            }
+            .architecture-container {
+                height: auto;
+                min-height: calc(100vh - 120px);
+                overflow: visible;
+            }
+            .tier {
+                min-height: auto;
+                padding: 54px 12px 28px;
+            }
+            .tier-label {
+                left: 12px;
+                right: 12px;
+                top: 12px;
+                width: auto;
+                text-align: center;
+                white-space: normal;
+                line-height: 1.35;
+            }
+            .tier-ui,
+            .tier-logic,
+            .tier-db {
+                flex: none;
+            }
+            .forms-wrapper {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 32px;
+                padding: 0;
+            }
+            .form-card {
+                width: min(100%, 360px);
+                margin: 0 auto;
+                box-sizing: border-box;
+            }
+            .list-view-table th,
+            .list-view-table td {
+                padding: 6px;
+                font-size: 10px;
+            }
+            .tier-logic {
+                gap: 26px;
+                flex-direction: column;
+            }
+            .logic-machine {
+                width: min(100%, 300px);
+                max-width: calc(100vw - 32px);
+            }
+            .after-logic-wrapper,
+            .batch-logic-wrapper,
+            .midnight-indicator,
+            .info-bubble {
+                position: relative;
+                right: auto;
+                left: auto;
+                top: auto;
+                bottom: auto;
+                transform: none;
+            }
+            .after-logic-wrapper,
+            .batch-logic-wrapper {
+                width: min(100%, 300px);
+                margin: 28px auto 0;
+            }
+            .after-logic-wrapper {
+                order: 2;
+            }
+            .tier-db {
+                align-items: center;
+                flex-direction: column;
+                gap: 20px;
+                padding-bottom: 30px;
+            }
+            .tier-db .tier-label {
+                top: 12px;
+                left: 12px;
+            }
+            .database-wrapper {
+                margin: 0 auto;
+                order: 1;
+            }
+            .database-box {
+                width: 210px;
+                height: 270px;
+            }
+            .box-back::after,
+            .box-front {
+                width: 210px;
+            }
+            .batch-logic-wrapper {
+                order: 2;
+            }
+            .midnight-indicator {
+                order: 3;
+                align-items: center;
+                text-align: center;
+                margin: 0 auto;
+            }
+            .midnight-text {
+                font-size: 22px;
+            }
+            .info-bubble {
+                order: 4;
+                width: min(100%, 360px);
+                box-sizing: border-box;
+                margin: 0 auto;
+                padding: 12px;
+            }
+            .route-guide {
+                display: none;
+            }
+            .toast {
+                width: calc(100% - 28px);
+                box-sizing: border-box;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1444,6 +1594,9 @@
 
         // SVGルート線の描画
         function drawRoutes() {
+            const routeGuide = document.getElementById('routeGuide');
+            if (!routeGuide || window.getComputedStyle(routeGuide).display === 'none') return;
+
             const contRect = container.getBoundingClientRect();
             const logicRect = logicZone.getBoundingClientRect();
             const dbRect = dbBox.getBoundingClientRect();
@@ -1463,8 +1616,32 @@
             document.getElementById('routeUpdate').setAttribute('d', pathData);
             document.getElementById('labelUpdate').setAttribute('x', detourX - 25);
         }
-        window.addEventListener('resize', drawRoutes);
-        setTimeout(drawRoutes, 60);
+        function getDbRecordPosition(index) {
+            const contRect = container.getBoundingClientRect();
+            const dbRect = dbBox.getBoundingClientRect();
+            return {
+                x: dbRect.left - contRect.left + (dbRect.width - RECORD_WIDTH) / 2,
+                y: dbRect.top - contRect.top + dbRect.height - ((index + 1) * (RECORD_HEIGHT + RECORD_MARGIN)) - 10
+            };
+        }
+
+        function relayoutDbRecords() {
+            dbRecords.forEach((rec, index) => {
+                const pos = getDbRecordPosition(index);
+                rec.topY = pos.y;
+                rec.elem.style.left = `${pos.x}px`;
+                rec.elem.style.top = `${pos.y}px`;
+            });
+        }
+
+        function refreshResponsiveLayout() {
+            drawRoutes();
+            relayoutDbRecords();
+        }
+
+        window.addEventListener('resize', refreshResponsiveLayout);
+        window.addEventListener('orientationchange', () => setTimeout(refreshResponsiveLayout, 120));
+        setTimeout(refreshResponsiveLayout, 60);
 
         // ==========================================
         // メール送信アニメーション (速度連動型)
@@ -1862,10 +2039,11 @@
                         // フェーズ3: DB層へ
                         setTimeout(() => {
                             if (operation === 'insert') {
-                                const endX = dbRect.left - contRect.left + (dbRect.width - RECORD_WIDTH) / 2;
+                                const dbPos = getDbRecordPosition(dbRecords.length);
+                                const endX = dbPos.x;
                                 
                                 if (dbRecords.length < MAX_CAPACITY) {
-                                    const endY = dbRect.top - contRect.top + dbRect.height - ((dbRecords.length + 1) * (RECORD_HEIGHT + RECORD_MARGIN)) - 10;
+                                    const endY = dbPos.y;
                                     
                                     record.style.transition = `top ${calcTime(200)}ms cubic-bezier(0.55, 0.085, 0.68, 0.53), left ${calcTime(200)}ms ease-in-out`;
                                     record.style.top = `${endY}px`;
