@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salesforce 画面→ロジック→データベース デジタルMAP</title>
+    <title>Salesforceの「ビュー・ロジック・モデル」　動く図解</title>
     <style>
         /* ベーススタイル */
         body {
@@ -624,7 +624,9 @@
             font-size: 9px;
             font-weight: bold;
             color: white;
-            padding: 2px 4px;
+            padding: 2px 5px;
+            min-width: 24px;
+            text-align: center;
             border-radius: 3px;
             margin-right: 6px;
         }
@@ -938,9 +940,9 @@
         /* 補足案内吹き出し */
         .info-bubble {
             position: absolute;
-            left: 20px;
-            bottom: 20px;
-            width: 320px;
+            left: 56px;
+            bottom: 8px;
+            width: 390px;
             background: rgba(255, 255, 255, 0.95);
             border: 1px solid #d8dde6;
             border-radius: 14px;
@@ -1002,7 +1004,7 @@
             .forms-wrapper { gap: 12px; padding: 0 12px; }
             .form-card { width: 250px; padding: 12px; }
             .tier-label { left: 12px; font-size: 12px; }
-            .info-bubble { width: 285px; bottom: 12px; left: 12px; padding: 10px 12px; }
+            .info-bubble { width: 330px; bottom: 8px; left: 32px; padding: 10px 12px; }
             .batch-logic-wrapper, .after-logic-wrapper { right: 28px; }
             .midnight-indicator { right: 28px; bottom: 190px; }
             .after-logic-wrapper { transform: translateY(-50%) scale(0.92); transform-origin: right center; }
@@ -1018,7 +1020,7 @@
             <svg width="22" height="16" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
                 <path d="M19.5 10C19.1 10 18.7 10.1 18.3 10.2C17.5 7.2 14.8 5 11.5 5C7.9 5 5 7.9 5 11.5C5 11.7 5 11.8 5.1 12C2.8 12.3 1 14.3 1 16.7C1 19.3 3.2 21.5 5.8 21.5H19.5C21.4 21.5 23 19.9 23 18C23 16.1 21.4 14.5 19.5 14.5C19.5 12 19.5 10 19.5 10Z"/>
             </svg>
-            マルチユーザー データフロー
+            Salesforceの「ビュー・ロジック・モデル」　動く図解
         </div>
         <div class="global-controls">
             <!-- 速度切り替え選択リスト -->
@@ -1587,7 +1589,7 @@
                                         const zipText = rec.elem.querySelector('.zipcode').innerText;
 
                                         returnRec.innerHTML = `
-                                            <span class="rec-badge" style="background:#6a1b9a;">UPD</span>
+                                            <span class="rec-badge" style="background:#6a1b9a;">更新</span>
                                             <span class="zipcode">${zipText}</span>
                                             <span class="acc-name">${newName}</span>
                                         `;
@@ -1791,7 +1793,7 @@
 
             const record = document.createElement('div');
             record.className = `record-item op-${operation}`;
-            const badgeText = operation === 'insert' ? 'INS' : 'UPD';
+            const badgeText = operation === 'insert' ? '登録' : '更新';
             record.innerHTML = `
                 <span class="rec-badge">${badgeText}</span>
                 <span class="zipcode">〒${zipStr}</span>
@@ -2034,7 +2036,7 @@
                             let cleanZip = data.zip.replace(/-/g, '').padEnd(7, '0').substring(0, 7);
                             const formattedZip = `${cleanZip.substring(0,3)}-${cleanZip.substring(3)}`;
                             record.innerHTML = `
-                                <span class="rec-badge">UPD</span>
+                                <span class="rec-badge">更新</span>
                                 <span class="zipcode" style="color:#04844b;">〒${formattedZip}</span>
                                 <span class="acc-name">${data.name}</span>
                             `;
