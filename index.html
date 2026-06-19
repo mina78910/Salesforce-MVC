@@ -665,6 +665,53 @@
             color: #706e6b; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
+        /* 入力項目が1つのレコードへまとまる瞬間の描写 */
+        .field-chip {
+            position: absolute;
+            min-width: 96px;
+            max-width: 176px;
+            height: 22px;
+            padding: 0 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(216, 221, 230, 0.95);
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: 0 8px 18px rgba(22, 50, 92, 0.18);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 10px;
+            font-weight: bold;
+            color: #16325c;
+            box-sizing: border-box;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            pointer-events: none;
+            z-index: 210;
+            will-change: transform, opacity, left, top;
+        }
+        .field-chip .chip-label {
+            color: #706e6b;
+            font-size: 9px;
+            flex: 0 0 auto;
+        }
+        .field-chip.zip-chip {
+            border-color: rgba(194, 57, 52, 0.35);
+            color: #c23934;
+            font-family: monospace;
+        }
+        .field-chip.name-chip {
+            border-color: rgba(21, 137, 238, 0.35);
+        }
+        .record-item.record-born {
+            animation: recordBorn calc(0.18s * var(--speed-ratio)) ease-out;
+        }
+        @keyframes recordBorn {
+            0% { transform: scale(0.86); filter: brightness(1.12); }
+            65% { transform: scale(1.07); filter: brightness(1.05); }
+            100% { transform: scale(1); filter: brightness(1); }
+        }
+
         /* Bulkレコードブロック */
         .record-bulk {
             position: absolute;
@@ -1781,6 +1828,101 @@
             };
         }
 
+        function animateElementPath(elem, points, duration, easing = 'ease-in-out', onComplete) {
+            const frames = points.map(point => ({
+                left: `${point.x}px`,
+                top: `${point.y}px`,
+                transform: point.transform || 'scale(1)',
+                opacity: point.opacity == null ? 1 : point.opacity
+            }));
+            const animation = elem.animate(frames, {
+                duration: calcTime(duration),
+                easing,
+                fill: 'forwards'
+            });
+            animation.addEventListener('finish', () => {
+                const last = points[points.length - 1];
+                elem.style.left = `${last.x}px`;
+                elem.style.top = `${last.y}px`;
+                elem.style.transform = last.transform || 'scale(1)';
+                elem.style.opacity = last.opacity == null ? '1' : String(last.opacity);
+                if (onComplete) onComplete();
+            }, { once: true });
+            return animation;
+        }
+
+        function animateFieldsMergingToRecord(formId, record, startX, startY, onComplete) {
+            const accInput = document.getElementById(`accName${formId}`);
+            const zipInput = document.getElementById(`zipInput${formId}`);
+            const contRect = container.getBoundingClientRect();
+
+            if (!accInput || !zipInput || window.getComputedStyle(accInput).display === 'none') {
+                record.style.left = `${startX}px`;
+                record.style.top = `${startY}px`;
+                record.classList.add('record-born');
+                setTimeout(() => record.classList.remove('record-born'), calcTime(180));
+                onComplete();
+                return;
+            }
+
+            const nameRect = accInput.getBoundingClientRect();
+            const zipRect = zipInput.getBoundingClientRect();
+            const nameChip = document.createElement('div');
+            const zipChip = document.createElement('div');
+            nameChip.className = 'field-chip name-chip';
+            zipChip.className = 'field-chip zip-chip';
+            nameChip.innerHTML = `<span class="chip-label">取引先名</span><span>${accInput.value}</span>`;
+            zipChip.innerHTML = `<span class="chip-label">郵便番号</span><span>〒${zipInput.value}</span>`;
+            container.appendChild(nameChip);
+            container.appendChild(zipChip);
+
+            const nameStart = { x: nameRect.left - contRect.left, y: nameRect.top - contRect.top };
+            const zipStart = { x: zipRect.left - contRect.left, y: zipRect.top - contRect.top };
+            const nameEnd = { x: startX + 14, y: startY + 1 };
+            const zipEnd = { x: startX + 84, y: startY + 1 };
+            nameChip.style.left = `${nameStart.x}px`;
+            nameChip.style.top = `${nameStart.y}px`;
+            zipChip.style.left = `${zipStart.x}px`;
+            zipChip.style.top = `${zipStart.y}px`;
+            record.style.left = `${startX}px`;
+            record.style.top = `${startY}px`;
+            record.style.opacity = '0';
+
+            let completed = 0;
+            const finishChip = () => {
+                completed++;
+                if (completed < 2) return;
+                nameChip.remove();
+                zipChip.remove();
+                record.style.opacity = '1';
+                record.classList.add('record-born');
+                setTimeout(() => record.classList.remove('record-born'), calcTime(180));
+                onComplete();
+            };
+
+            animateElementPath(nameChip, [
+                { ...nameStart, transform: 'scale(1)', opacity: 1 },
+                { x: nameStart.x, y: startY + 34, transform: 'scale(0.98)', opacity: 1 },
+                { ...nameEnd, transform: 'scale(0.76)', opacity: 0.2 }
+            ], 170, 'cubic-bezier(0.25, 1, 0.5, 1)', finishChip);
+            animateElementPath(zipChip, [
+                { ...zipStart, transform: 'scale(1)', opacity: 1 },
+                { x: zipStart.x, y: startY + 40, transform: 'scale(0.98)', opacity: 1 },
+                { ...zipEnd, transform: 'scale(0.76)', opacity: 0.2 }
+            ], 170, 'cubic-bezier(0.25, 1, 0.5, 1)', finishChip);
+        }
+
+        function moveRecordToLogic(elem, startX, startY, midX, midY, duration, onComplete) {
+            const verticalDropY = startY + Math.max(42, Math.min(78, (midY - startY) * 0.42));
+            const preLogicY = midY + Math.min(22, Math.max(8, (midY - startY) * 0.08));
+            animateElementPath(elem, [
+                { x: startX, y: startY },
+                { x: startX, y: verticalDropY },
+                { x: startX + (midX - startX) * 0.45, y: preLogicY },
+                { x: midX, y: midY }
+            ], duration, 'cubic-bezier(0.22, 0.61, 0.36, 1)', onComplete);
+        }
+
 
         function setRecordStatus(recordElem, status) {
             if (!recordElem) return;
@@ -2158,16 +2300,12 @@
             record.style.top = `${startY}px`;
             record.offsetHeight;
 
-            // フェーズ1: 落下
-            record.style.transition = `top ${calcTime(260)}ms ease-in, left ${calcTime(260)}ms ease-in-out`;
-            record.style.top = `${midY}px`;
-            record.style.left = `${midX}px`;
-
-            setTimeout(() => {
-                // フェーズ2: ロジック処理
-                
-                let cleanZip = zipStr.replace(/-/g, '').trim();
-                const isLengthError = operation === 'insert' && cleanZip.length < 7;
+            // フェーズ1: 取引先名 + 郵便番号が1つのレコードになり、下へ少し落ちてから緩やかにロジックへ向かう
+            animateFieldsMergingToRecord(formId, record, startX, startY, () => {
+                moveRecordToLogic(record, startX, startY, midX, midY, 260, () => {
+                    // フェーズ2: ロジック処理
+                    let cleanZip = zipStr.replace(/-/g, '').trim();
+                    const isLengthError = operation === 'insert' && cleanZip.length < 7;
 
                 if (isLengthError) {
                     // --- エラー時（跳ね返り）ルート ---
@@ -2300,7 +2438,8 @@
                         }, calcTime(200)); 
                     }, calcTime(100)); 
                 }
-            }, calcTime(200));
+                });
+            });
         }
 
         // ==========================================
@@ -2347,12 +2486,8 @@
             bulk.style.top = `${startY}px`;
             bulk.offsetHeight; 
 
-            // フェーズ1: 塊として落下
-            bulk.style.transition = `top ${calcTime(200)}ms ease-in, left ${calcTime(200)}ms ease-in-out`;
-            bulk.style.top = `${midY}px`;
-            bulk.style.left = `${midX}px`;
-
-            setTimeout(() => {
+            // フェーズ1: 塊として少し垂直に下がってから、緩やかにロジックへ向かう
+            moveRecordToLogic(bulk, startX, startY, midX, midY, 200, () => {
                 logicMachine.classList.add('active');
                 setTimeout(() => {
                     bulk.querySelectorAll('.zipcode').forEach((el, i) => {
@@ -2428,7 +2563,7 @@
 
                     }, calcTime(260)); 
                 }, calcTime(200)); 
-            }, calcTime(260)); 
+            });
         }
 
         // ==========================================
