@@ -223,6 +223,21 @@
             align-items: center;
             gap: 4px;
         }
+        .page-type-badge {
+            font-size: 10px;
+            font-weight: bold;
+            color: #16325c;
+            background: #eef4ff;
+            border: 1px solid #bcd7ff;
+            border-radius: 999px;
+            padding: 2px 8px;
+            white-space: nowrap;
+        }
+        .page-type-badge.list-view {
+            color: #7a3b00;
+            background: #fff4df;
+            border-color: #f4c47a;
+        }
 
         /* ユーザーアバター */
         .user-avatar {
@@ -1039,6 +1054,7 @@
                     <div class="form-success-toast" id="formSuccess1">成功</div>
                     <div class="form-header">
                         <div class="user-badge">🏢 東京本社</div>
+                        <div class="page-type-badge">レコードページ</div>
                     </div>
                     <div class="form-row">
                         <div class="input-group">
@@ -1077,6 +1093,7 @@
                     <div class="form-success-toast" id="formSuccess2">成功</div>
                     <div class="form-header">
                         <div class="user-badge">🏭 大阪支社</div>
+                        <div class="page-type-badge">レコードページ</div>
                     </div>
                     <div class="form-row">
                         <div class="input-group">
@@ -1113,10 +1130,11 @@
                     <div class="form-success-toast" id="formSuccess3">成功</div>
                     <div class="form-header">
                         <div class="user-badge">🍜 福岡営業所</div>
+                        <div class="page-type-badge list-view">リストビュー</div>
                     </div>
                     
                     <!-- 1件用 (Insert時) -->
-                    <div class="form-row" id="singleRow3">
+                    <div class="form-row" id="singleRow3" style="display:none;">
                         <div class="input-group">
                             <label>取引先名</label>
                             <input type="text" id="accName3" readonly>
@@ -1128,9 +1146,9 @@
                     </div>
 
                     <!-- リストビュー用 (Update時) -->
-                    <div class="list-view-container" id="multiRow3" style="display:none;">
+                    <div class="list-view-container" id="multiRow3">
                         <table class="list-view-table">
-                            <thead><tr><th>更新対象</th><th>新・郵便番号</th></tr></thead>
+                            <thead><tr><th>取引先名</th><th>郵便番号</th></tr></thead>
                             <tbody id="multiRowBody3">
                                 <!-- JS de 動的生成 -->
                             </tbody>
@@ -1266,7 +1284,7 @@
         const formsData = [
             { id: 1, op: 'insert', targetDbIndex: -1, preName: '東京クラウド' },
             { id: 2, op: 'insert', targetDbIndex: -1, preName: 'なにわシステム' },
-            { id: 3, op: 'insert', targetDbIndex: -1, preName: '博多テック' }
+            { id: 3, op: 'update-multi', targetDbIndex: -1, preName: '博多テック', multiData: [] }
         ];
 
         // DOM
@@ -1295,6 +1313,21 @@
             return `${Math.floor(100 + Math.random() * 900)}${Math.floor(1000 + Math.random() * 9000)}`;
         }
 
+        function renderFukuokaListView(rows) {
+            const tbody = document.getElementById('multiRowBody3');
+            if (!tbody) return;
+
+            if (!rows || rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="2">更新対象レコードなし</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            rows.forEach(d => {
+                tbody.innerHTML += `<tr><td>${d.name}</td><td>〒${d.zip}</td></tr>`;
+            });
+        }
+
         // 次の操作を準備 (ステップ固定式に全面改修 - op-indicator処理を除去)
         function prepareNextOperation() {
             // 全フォームを初期化
@@ -1304,11 +1337,15 @@
                 const singleRow = document.getElementById(`singleRow${form.id}`);
                 const multiRow = document.getElementById(`multiRow${form.id}`);
                 
-                if (singleRow && multiRow) {
-                    singleRow.style.display = 'flex';
-                    multiRow.style.display = 'none';
+                if (form.id === 3) {
+                    if (singleRow) singleRow.style.display = 'none';
+                    if (multiRow) multiRow.style.display = 'block';
+                    form.op = 'update-multi';
+                    form.multiData = [];
+                    renderFukuokaListView([]);
+                    return;
                 }
-                
+
                 form.op = 'insert';
                 accInput.value = `株式会社${form.preName} ${nextAccountId}`;
                 zipInput.value = generateRandomZip();
@@ -1323,7 +1360,8 @@
             let targetFormId = 1;
             if (currentStep === 1 || currentStep === 4) targetFormId = 1;
             if (currentStep === 2 || currentStep === 5) targetFormId = 2;
-            if (currentStep === 3 || currentStep === 6) targetFormId = 3;
+            if (currentStep === 3) targetFormId = 1;
+            if (currentStep === 6) targetFormId = 3;
 
             const form = formsData.find(f => f.id === targetFormId);
             const accInput = document.getElementById(`accName${targetFormId}`);
@@ -1364,15 +1402,10 @@
                             zip: generateRandomZip()
                         };
                     });
-                    const tbody = document.getElementById('multiRowBody3');
-                    tbody.innerHTML = '';
-                    form.multiData.forEach(d => {
-                        tbody.innerHTML += `<tr><td>${d.name}</td><td>〒${d.zip}</td></tr>`;
-                    });
+                    renderFukuokaListView(form.multiData);
                 } else {
-                    form.op = 'insert';
-                    singleRow.style.display = 'flex';
-                    multiRow.style.display = 'none';
+                    form.multiData = [];
+                    renderFukuokaListView([]);
                 }
             }
         }
@@ -2064,7 +2097,8 @@
             let targetFormId = 1;
             if (currentStep === 1 || currentStep === 4) targetFormId = 1;
             if (currentStep === 2 || currentStep === 5) targetFormId = 2;
-            if (currentStep === 3 || currentStep === 6) targetFormId = 3;
+            if (currentStep === 3) targetFormId = 1;
+            if (currentStep === 6) targetFormId = 3;
 
             const formObj = formsData.find(f => f.id === targetFormId);
 
