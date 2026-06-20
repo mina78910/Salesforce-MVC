@@ -422,6 +422,14 @@
             position: absolute; inset: 0; background: rgba(76, 217, 100, 0.4);
             opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 20; border-radius: 8px;
         }
+        @keyframes logicMachineProcessingShake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+            20%, 40%, 60%, 80% { transform: translateX(4px); }
+        }
+        .logic-machine.active {
+            animation: logicMachineProcessingShake calc(0.5s * var(--speed-ratio)) ease-in-out;
+        }
         .logic-machine.active .logic-flash { opacity: 1; }
         .logic-machine.error .logic-flash { background: rgba(194, 57, 52, 0.4); opacity: 1; } /* エラー時の赤フラッシュ */
 
