@@ -16,7 +16,7 @@
 
         /* 速度調整用のCSS変数 (JSから動的に書き換えます) */
         :root {
-            --speed-ratio: 0.67; /* デフォルト 1.5倍速時の時間比率 (1 / 1.5) */
+            --speed-ratio: 1.3333333333; /* デフォルト 0.75倍速時の時間比率 (1 / 0.75) */
         }
 
         /* ヘッダー */
@@ -1485,9 +1485,9 @@
             <div class="speed-selector-container">
                 <span>再生速度:</span>
                 <select id="speedSelect">
-                    <option value="1.5" selected>1.5倍速</option>
+                    <option value="1.5">1.5倍速</option>
                     <option value="1.0">1.0倍速</option>
-                    <option value="0.75">0.75倍速</option>
+                    <option value="0.75" selected>0.75倍速</option>
                 </select>
             </div>
             
@@ -1755,7 +1755,7 @@
         let isAnimating = false;
 
         // 速度制御用
-        let speedFactor = 1.5; 
+        let speedFactor = 0.75;
         let speedRatio = 1 / speedFactor; // 時間の掛け算用比率
 
         // ミリ秒計算用ユーティリティ
