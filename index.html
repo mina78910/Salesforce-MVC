@@ -906,7 +906,7 @@
 
         .form-action-indicator {
             position: absolute;
-            top: 50%;
+            top: 38%;
             left: 50%;
             transform: translate(-50%, -50%) scale(0.9);
             background: white;
@@ -929,12 +929,10 @@
         .form-action-indicator .action-title {
             font-size: 14px;
             font-weight: bold;
-            margin-bottom: 6px;
+            margin-bottom: 0;
         }
         .form-action-indicator .action-desc {
-            font-size: 11px;
-            color: #3e3e3c;
-            font-weight: bold;
+            display: none;
         }
         .form-action-indicator.insert { border-color: #0070d2; background: #f0f8ff; }
         .form-action-indicator.insert .action-title { color: #0070d2; }
@@ -2609,18 +2607,14 @@
             const indElem = document.getElementById(`actionInd${targetFormId}`);
             const overlayElem = document.getElementById(`actionOverlay${targetFormId}`);
             const titleElem = document.getElementById(`actionTitle${targetFormId}`);
-            const descElem = document.getElementById(`actionDesc${targetFormId}`);
             
             indElem.className = `form-action-indicator ${formObj.op}`;
             if (formObj.op === 'insert') {
                 titleElem.innerText = '新規登録';
-                descElem.innerText = 'レコード作成処理を実行中...';
             } else if (formObj.op === 'update') {
                 titleElem.innerText = '既存更新';
-                descElem.innerText = '既存レコードを更新中...';
             } else if (formObj.op === 'update-multi') {
                 titleElem.innerText = 'リストビュー一括更新';
-                descElem.innerText = '3件 of レコードを同時更新中...';
             }
             indElem.classList.add('show');
             overlayElem.classList.add('show');
