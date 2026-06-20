@@ -1756,6 +1756,7 @@
         let isParallelRunning = false;
         let parallelTimeout; // 一斉実行の連続投入タイマー
         let activeParallelBatches = 0;
+        let parallelBatchSequence = 0;
         let isAnimating = false;
 
         // 速度制御用
@@ -2777,7 +2778,7 @@
                 }));
         }
 
-        function prepareParallelOperationForms() {
+        function prepareParallelOperationForms(includeBulkUpdate = true) {
             const insertForms = [1, 2];
             insertForms.forEach(formId => {
                 const form = formsData.find(f => f.id === formId);
@@ -2795,7 +2796,7 @@
             if (singleRow) singleRow.style.display = 'none';
             if (multiRow) multiRow.style.display = 'block';
             fukuoka.op = 'update-multi';
-            fukuoka.multiData = buildParallelMultiData();
+            fukuoka.multiData = includeBulkUpdate ? buildParallelMultiData() : [];
             renderFukuokaListView(fukuoka.multiData);
         }
 
@@ -2808,7 +2809,10 @@
         function startParallelBatch() {
             if (!isParallelRunning) return;
 
-            prepareParallelOperationForms();
+            const sequence = parallelBatchSequence++;
+            const shouldRunBulkAndBatch = sequence % 2 === 0;
+
+            prepareParallelOperationForms(shouldRunBulkAndBatch);
             activeParallelBatches++;
 
             const tasks = [];
@@ -2824,7 +2828,7 @@
 
             const fukuoka = formsData.find(f => f.id === 3);
             const fukuokaMultiData = fukuoka.multiData.map(data => ({ ...data }));
-            if (fukuokaMultiData.length > 0) {
+            if (shouldRunBulkAndBatch && fukuokaMultiData.length > 0) {
                 const fetchTargets = fukuokaMultiData.map(d => d.targetDbIndex);
                 scheduleParallelTask(tasks, 340, done => {
                     fetchFromDB(fetchTargets, 3, () => {
@@ -2835,7 +2839,7 @@
                 });
             }
 
-            if (dbRecords.length > 0) {
+            if (shouldRunBulkAndBatch && dbRecords.length > 0) {
                 scheduleParallelTask(tasks, 520, done => runBatchAnimation(done));
             }
 
@@ -2857,6 +2861,7 @@
             }
 
             if (isAutoRunning || isAnimating) return;
+            parallelBatchSequence = 0;
             setParallelRunningState(true);
             startParallelBatch();
         }
@@ -3020,6 +3025,7 @@
             isAnimating = false;
             isParallelRunning = false;
             activeParallelBatches = 0;
+            parallelBatchSequence = 0;
             clearTimeout(parallelTimeout);
             setParallelRunningState(false);
             toast.classList.remove('show');
