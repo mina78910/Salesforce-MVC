@@ -298,6 +298,45 @@
         .form-card[data-user="3"] .save-button.center-bottom {
             margin-top: auto;
         }
+
+        /* 保存ボタン押下アニメーション */
+        .mouse-click-pointer {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            z-index: 260;
+            pointer-events: none;
+            opacity: 0;
+            transform: translate(-22px, -22px) scale(0.92);
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35));
+            will-change: left, top, transform, opacity;
+        }
+        .mouse-click-pointer svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .save-button.clicking {
+            transform: translateY(1px) scale(0.96);
+            box-shadow: 0 3px 8px rgba(21, 137, 238, 0.24);
+            background: #0b5cab;
+        }
+        .save-click-ripple {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border: 3px solid rgba(21, 137, 238, 0.62);
+            border-radius: 50%;
+            z-index: 255;
+            pointer-events: none;
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.3);
+            animation: saveClickRipple calc(360ms * var(--speed-ratio)) ease-out forwards;
+        }
+        @keyframes saveClickRipple {
+            0% { opacity: 0.9; transform: translate(-50%, -50%) scale(0.3); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(2.2); }
+        }
         
         /* データ発射口（アニメーション座標用の不可視アンカー） */
         .form-outlet {
@@ -2286,6 +2325,70 @@
             }
         }
 
+
+
+        // ==========================================
+        // 保存ボタンをマウスで押下する導入アニメーション
+        // ==========================================
+        function animateSaveButtonClick(formId, onComplete) {
+            const cardElem = document.getElementById(`form${formId}`);
+            const saveButton = cardElem ? cardElem.querySelector('.save-button') : null;
+            if (!cardElem || !saveButton) {
+                if (onComplete) onComplete();
+                return;
+            }
+
+            const pointer = document.createElement('div');
+            pointer.className = 'mouse-click-pointer';
+            pointer.innerHTML = `
+                <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M7 3 L24 18 L16 19.5 L20.5 28 L16.8 30 L12.3 21.4 L7 27 Z" fill="#ffffff" stroke="#080707" stroke-width="2" stroke-linejoin="round"/>
+                </svg>
+            `;
+            container.appendChild(pointer);
+
+            const contRect = container.getBoundingClientRect();
+            const cardRect = cardElem.getBoundingClientRect();
+            const buttonRect = saveButton.getBoundingClientRect();
+            const startX = cardRect.left - contRect.left + cardRect.width * 0.22;
+            const startY = cardRect.top - contRect.top + cardRect.height * 0.22;
+            const endX = buttonRect.left - contRect.left + buttonRect.width * 0.55;
+            const endY = buttonRect.top - contRect.top + buttonRect.height * 0.58;
+            const moveDuration = calcTime(330);
+            const pressDuration = calcTime(160);
+
+            pointer.style.left = `${startX}px`;
+            pointer.style.top = `${startY}px`;
+            pointer.style.transition = `left ${moveDuration}ms cubic-bezier(0.22, 0.61, 0.36, 1), top ${moveDuration}ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity ${calcTime(120)}ms ease, transform ${moveDuration}ms ease`;
+            void pointer.offsetWidth;
+            pointer.style.opacity = '1';
+            pointer.style.left = `${endX}px`;
+            pointer.style.top = `${endY}px`;
+            pointer.style.transform = 'translate(-22px, -22px) scale(1)';
+
+            setTimeout(() => {
+                saveButton.classList.add('clicking');
+                pointer.style.transform = 'translate(-20px, -20px) scale(0.86)';
+
+                const ripple = document.createElement('div');
+                ripple.className = 'save-click-ripple';
+                ripple.style.left = `${endX}px`;
+                ripple.style.top = `${endY}px`;
+                container.appendChild(ripple);
+
+                setTimeout(() => {
+                    saveButton.classList.remove('clicking');
+                    pointer.style.opacity = '0';
+                    pointer.style.transform = 'translate(-22px, -22px) scale(0.92)';
+                    setTimeout(() => {
+                        pointer.remove();
+                        ripple.remove();
+                        if (onComplete) onComplete();
+                    }, calcTime(170));
+                }, pressDuration);
+            }, moveDuration);
+        }
+
         // ==========================================
         // 1件登録・更新用アニメーション (速度連動型)
         // ==========================================
@@ -2647,8 +2750,9 @@
             let isActionIndicatorHidden = false;
             let isFetchComplete = false;
 
-            // インジケーター表示
-            const indElem = document.getElementById(`actionInd${targetFormId}`);
+            const beginActionIndicator = () => {
+                // インジケーター表示
+                const indElem = document.getElementById(`actionInd${targetFormId}`);
             const overlayElem = document.getElementById(`actionOverlay${targetFormId}`);
             const titleElem = document.getElementById(`actionTitle${targetFormId}`);
             
@@ -2715,6 +2819,9 @@
                 isFetchComplete = true;
                 startMainAnimationIfReady();
             });
+            };
+
+            animateSaveButtonClick(targetFormId, beginActionIndicator);
         }
 
         // イベント制御
