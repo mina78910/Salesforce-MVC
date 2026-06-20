@@ -1492,6 +1492,7 @@
             </div>
             
             <button class="btn-global primary" id="submitBtn">1件実行</button>
+            <button class="btn-global" id="parallelBtn">一斉実行</button>
             <button class="btn-global success" id="autoBtn">▶ 自動実行</button>
             <button class="btn-global" id="clearBtn">リセット</button>
         </div>
@@ -1782,6 +1783,7 @@
         
         const submitBtn = document.getElementById('submitBtn');
         const autoBtn = document.getElementById('autoBtn');
+        const parallelBtn = document.getElementById('parallelBtn');
         const clearBtn = document.getElementById('clearBtn');
         const toast = document.getElementById('toast');
         const speedSelect = document.getElementById('speedSelect');
@@ -2621,10 +2623,10 @@
                 cardElem.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
             }, calcTime(100));
 
-            // Bulkコンテナ(3件の塊)生成
+            // Bulkコンテナ(対象件数分の塊)生成
             const bulk = document.createElement('div');
             bulk.className = 'record-bulk op-update';
-            let innerHTML = '<div class="record-bulk-header">Bulk Update (3件一括処理)</div>';
+            let innerHTML = `<div class="record-bulk-header">Bulk Update (${formObj.multiData.length}件一括処理)</div>`;
             formObj.multiData.forEach(d => {
                 innerHTML += `
                     <div class="record-bulk-item">
@@ -2732,6 +2734,92 @@
                     }, calcTime(260)); 
                 }, calcTime(200)); 
             }, calcTime(260)); 
+        }
+
+        function setControlsDisabled(disabled, includeParallel = true) {
+            submitBtn.disabled = disabled;
+            autoBtn.disabled = disabled;
+            clearBtn.disabled = disabled;
+            if (includeParallel) parallelBtn.disabled = disabled;
+        }
+
+        function buildParallelMultiData() {
+            const targetCount = Math.min(3, dbRecords.length);
+            if (targetCount <= 0) return [];
+
+            return dbRecords
+                .map((_, index) => index)
+                .sort(() => 0.5 - Math.random())
+                .slice(0, targetCount)
+                .sort((a, b) => a - b)
+                .map(idx => ({
+                    targetDbIndex: idx,
+                    name: dbRecords[idx].name.replace(/\(株\)/g, '株式会社'),
+                    zip: generateRandomZip()
+                }));
+        }
+
+        function prepareParallelOperationForms() {
+            const insertForms = [1, 2];
+            insertForms.forEach(formId => {
+                const form = formsData.find(f => f.id === formId);
+                const accInput = document.getElementById(`accName${formId}`);
+                const zipInput = document.getElementById(`zipInput${formId}`);
+                form.op = 'insert';
+                form.targetDbIndex = -1;
+                accInput.value = `株式会社${form.preName} ${nextAccountId + formId - 1}`;
+                zipInput.value = generateRandomZip();
+            });
+
+            const fukuoka = formsData.find(f => f.id === 3);
+            const singleRow = document.getElementById('singleRow3');
+            const multiRow = document.getElementById('multiRow3');
+            if (singleRow) singleRow.style.display = 'none';
+            if (multiRow) multiRow.style.display = 'block';
+            fukuoka.op = 'update-multi';
+            fukuoka.multiData = buildParallelMultiData();
+            renderFukuokaListView(fukuoka.multiData);
+        }
+
+        function runParallelMode() {
+            if (isAutoRunning || isAnimating) return;
+
+            isAnimating = true;
+            prepareParallelOperationForms();
+            setControlsDisabled(true);
+
+            const tasks = [];
+            const addTask = (runner) => tasks.push(new Promise(resolve => runner(resolve)));
+
+            [1, 2].forEach(formId => {
+                addTask(done => {
+                    animateSaveButtonClick(formId, () => {
+                        const zipStr = document.getElementById(`zipInput${formId}`).value;
+                        const accName = document.getElementById(`accName${formId}`).value;
+                        runSingleAnimation('insert', zipStr, accName, formId, -1, done);
+                    });
+                });
+            });
+
+            const fukuoka = formsData.find(f => f.id === 3);
+            if (fukuoka.multiData.length > 0) {
+                const fetchTargets = fukuoka.multiData.map(d => d.targetDbIndex);
+                addTask(done => {
+                    fetchFromDB(fetchTargets, 3, () => {
+                        animateSaveButtonClick(3, () => startMultiAnimation(fukuoka, 3, done));
+                    });
+                });
+            }
+
+            if (dbRecords.length > 0) {
+                addTask(done => setTimeout(() => runBatchAnimation(done), calcTime(220)));
+            }
+
+            Promise.all(tasks).then(() => {
+                isAnimating = false;
+                setControlsDisabled(false);
+                prepareNextOperation();
+            });
         }
 
         // ==========================================
@@ -2861,6 +2949,8 @@
             processRecord();
         });
 
+        parallelBtn.addEventListener('click', runParallelMode);
+
         autoBtn.addEventListener('click', () => {
             if (isAutoRunning) {
                 isAutoRunning = false;
@@ -2868,11 +2958,13 @@
                 autoBtn.innerText = '▶ 自動実行';
                 autoBtn.className = 'btn-global success';
                 submitBtn.disabled = false;
+                parallelBtn.disabled = false;
             } else {
                 isAutoRunning = true;
                 autoBtn.innerText = '■ 停止';
                 autoBtn.className = 'btn-global danger';
                 submitBtn.disabled = true;
+                parallelBtn.disabled = true;
                 
                 processRecord();
             }
@@ -2905,6 +2997,7 @@
                 autoBtn.innerText = '▶ 自動実行';
                 autoBtn.className = 'btn-global success';
                 submitBtn.disabled = false;
+                parallelBtn.disabled = false;
             }
             prepareNextOperation();
         });
