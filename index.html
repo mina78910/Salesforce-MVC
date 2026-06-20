@@ -2780,16 +2780,58 @@
                 }));
         }
 
-        function prepareParallelOperationForms(includeBulkUpdate = true) {
-            const insertForms = [1, 2];
-            insertForms.forEach(formId => {
-                const form = formsData.find(f => f.id === formId);
-                const accInput = document.getElementById(`accName${formId}`);
-                const zipInput = document.getElementById(`zipInput${formId}`);
-                form.op = 'insert';
-                form.targetDbIndex = -1;
-                accInput.value = `株式会社${form.preName} ${nextAccountId + formId - 1}`;
-                zipInput.value = generateRandomZip();
+        function pickRandomDbIndex() {
+            if (dbRecords.length === 0) return -1;
+            return Math.floor(Math.random() * dbRecords.length);
+        }
+
+        function buildParallelPrimaryOperations(sequence) {
+            const dbCount = dbRecords.length;
+            const preferNonInsert = dbCount > 5;
+            const operations = [
+                { formId: 1, operation: 'insert', targetDbIndex: -1, zip: generateRandomZip() },
+                { formId: 2, operation: 'insert', targetDbIndex: -1, zip: generateRandomZip() }
+            ];
+
+            if (dbCount > 0 && (preferNonInsert || sequence % 4 === 2)) {
+                operations[0].operation = 'update';
+                operations[0].targetDbIndex = pickRandomDbIndex();
+                operations[0].zip = generateRandomZip();
+            }
+
+            if (preferNonInsert || sequence % 4 === 1) {
+                operations[1].operation = 'insert';
+                operations[1].targetDbIndex = -1;
+                operations[1].zip = String(Math.floor(10000 + Math.random() * 90000));
+            } else if (dbCount > 0 && sequence % 4 === 3) {
+                operations[1].operation = 'update';
+                operations[1].targetDbIndex = pickRandomDbIndex();
+                operations[1].zip = generateRandomZip();
+            }
+
+            return operations.map((op, index) => {
+                const form = formsData.find(f => f.id === op.formId);
+                const targetRec = dbRecords[op.targetDbIndex];
+                return {
+                    ...op,
+                    delay: index * 170,
+                    name: op.operation === 'update' && targetRec
+                        ? targetRec.name.replace(/\(株\)/g, '株式会社')
+                        : `株式会社${form.preName} ${nextAccountId + index}`
+                };
+            });
+        }
+
+        function prepareParallelOperationForms(sequence, includeBulkUpdate = true) {
+            const primaryOperations = buildParallelPrimaryOperations(sequence);
+            primaryOperations.forEach(op => {
+                const form = formsData.find(f => f.id === op.formId);
+                const accInput = document.getElementById(`accName${op.formId}`);
+                const zipInput = document.getElementById(`zipInput${op.formId}`);
+                form.op = op.operation;
+                form.targetDbIndex = op.targetDbIndex;
+                accInput.value = op.name;
+                zipInput.value = op.zip;
             });
 
             const fukuoka = formsData.find(f => f.id === 3);
@@ -2800,6 +2842,8 @@
             fukuoka.op = 'update-multi';
             fukuoka.multiData = includeBulkUpdate ? buildParallelMultiData() : [];
             renderFukuokaListView(fukuoka.multiData);
+
+            return primaryOperations;
         }
 
         function scheduleParallelTask(tasks, delayMs, runner) {
@@ -2814,22 +2858,30 @@
             const sequence = parallelBatchSequence++;
             const shouldRunBulkAndBatch = sequence % 2 === 0;
 
-            prepareParallelOperationForms(shouldRunBulkAndBatch);
+            const primaryOperations = prepareParallelOperationForms(sequence, shouldRunBulkAndBatch);
             activeParallelBatches++;
 
             const tasks = [];
-            [1, 2].forEach((formId, index) => {
-                const zipStr = document.getElementById(`zipInput${formId}`).value;
-                const accName = document.getElementById(`accName${formId}`).value;
-                const preferredInsertIndex = dbRecords.length + reservedParallelInsertSlots;
-                reservedParallelInsertSlots++;
-                scheduleParallelTask(tasks, index * 170, done => {
-                    animateSaveButtonClick(formId, () => {
-                        runSingleAnimation('insert', zipStr, accName, formId, -1, () => {
-                            reservedParallelInsertSlots = Math.max(0, reservedParallelInsertSlots - 1);
+            primaryOperations.forEach(op => {
+                const reservesDbSlot = op.operation === 'insert' && op.zip.replace(/-/g, '').trim().length >= 7;
+                const preferredInsertIndex = reservesDbSlot ? dbRecords.length + reservedParallelInsertSlots : null;
+                if (reservesDbSlot) reservedParallelInsertSlots++;
+
+                scheduleParallelTask(tasks, op.delay, done => {
+                    const runOperation = () => {
+                        runSingleAnimation(op.operation, op.zip, op.name, op.formId, op.targetDbIndex, () => {
+                            if (reservesDbSlot) {
+                                reservedParallelInsertSlots = Math.max(0, reservedParallelInsertSlots - 1);
+                            }
                             done();
                         }, preferredInsertIndex);
-                    });
+                    };
+
+                    if (op.operation === 'update') {
+                        fetchFromDB([op.targetDbIndex], op.formId, () => animateSaveButtonClick(op.formId, runOperation));
+                    } else {
+                        animateSaveButtonClick(op.formId, runOperation);
+                    }
                 });
             });
 
