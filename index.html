@@ -2642,7 +2642,10 @@
 
             const formObj = formsData.find(f => f.id === targetFormId);
             const actionIndicatorDisplayDuration = calcTime(500);
+            const actionIndicatorFadeDuration = calcTime(300);
             let actionIndicatorHideTimeout = null;
+            let isActionIndicatorHidden = false;
+            let isFetchComplete = false;
 
             // インジケーター表示
             const indElem = document.getElementById(`actionInd${targetFormId}`);
@@ -2662,6 +2665,11 @@
             actionIndicatorHideTimeout = setTimeout(() => {
                 indElem.classList.remove('show');
                 overlayElem.classList.remove('show');
+                actionIndicatorHideTimeout = null;
+                setTimeout(() => {
+                    isActionIndicatorHidden = true;
+                    startMainAnimationIfReady();
+                }, actionIndicatorFadeDuration);
             }, actionIndicatorDisplayDuration);
 
             // 処理完了時のコールバック定義 (自律トリガーを呼ぶ)
@@ -2680,6 +2688,19 @@
                 }
             };
 
+            const startMainAnimationIfReady = () => {
+                if (!isFetchComplete || !isActionIndicatorHidden) return;
+
+                // 表示が完全に消えてから、登録・更新アニメーションを開始する
+                if (formObj.op === 'update-multi') {
+                    startMultiAnimation(formObj, targetFormId, finishOperation);
+                } else {
+                    const zipStr = document.getElementById(`zipInput${targetFormId}`).value;
+                    const accName = document.getElementById(`accName${targetFormId}`).value;
+                    runSingleAnimation(formObj.op, zipStr, accName, targetFormId, formObj.targetDbIndex, finishOperation);
+                }
+            };
+
             // Fetch(取得)が必要なターゲットのインデックス配列を作成
             let fetchIndices = [];
             if (formObj.op === 'update') {
@@ -2688,16 +2709,11 @@
                 fetchIndices = formObj.multiData.map(d => d.targetDbIndex);
             }
 
-            // まずDBからレコードを取得するアニメーションを実行
+            // 既存更新・リストビュー一括更新のレコード読み込みは表示中に実行し、
+            // 登録・更新アニメーション本体は表示が消えてから開始する。
             fetchFromDB(fetchIndices, targetFormId, () => {
-                // 取得完了後、既存の送出アニメーションを開始
-                if (formObj.op === 'update-multi') {
-                    startMultiAnimation(formObj, targetFormId, finishOperation);
-                } else {
-                    const zipStr = document.getElementById(`zipInput${targetFormId}`).value;
-                    const accName = document.getElementById(`accName${targetFormId}`).value;
-                    runSingleAnimation(formObj.op, zipStr, accName, targetFormId, formObj.targetDbIndex, finishOperation);
-                }
+                isFetchComplete = true;
+                startMainAnimationIfReady();
             });
         }
 
