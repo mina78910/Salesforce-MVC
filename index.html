@@ -1587,7 +1587,6 @@
                 <div class="database-box" id="databaseBox">
                     <div class="box-back"></div>
                     <div class="capacity-marks">
-                        <div class="mark-max">10</div>
                         <div class="mark-max-line"></div>
                         <div class="mark-line" style="bottom: 20%"></div>
                         <div class="mark-line" style="bottom: 40%"></div>
@@ -1637,6 +1636,7 @@
     <script>
         // 設定値
         const MAX_CAPACITY = 10; 
+        const UPDATE_DB_ANIMATION_SLOW_RATIO = 1.8; // 更新レコードが郵便番号処理後にDBへ戻る動きを少しゆっくり見せる
         const RECORD_HEIGHT = 24;
         const RECORD_MARGIN = 2;
         const RECORD_WIDTH = 190;
@@ -1657,6 +1657,10 @@
         // ミリ秒計算用ユーティリティ
         function calcTime(baseMs) {
             return baseMs * speedRatio;
+        }
+
+        function calcUpdateDbTime(baseMs) {
+            return calcTime(baseMs * UPDATE_DB_ANIMATION_SLOW_RATIO);
         }
 
         // フォーム群の状態
@@ -2397,15 +2401,15 @@
                                 const endY = targetRec.topY; 
                                 const detourX = midX + 190; 
 
-                                record.style.transition = `left ${calcTime(150)}ms ease-in-out`;
+                                record.style.transition = `left ${calcUpdateDbTime(150)}ms ease-in-out`;
                                 record.style.left = `${detourX}px`;
 
                                 setTimeout(() => {
-                                    record.style.transition = `top ${calcTime(150)}ms ease-in-out`;
+                                    record.style.transition = `top ${calcUpdateDbTime(150)}ms ease-in-out`;
                                     record.style.top = `${endY}px`;
 
                                     setTimeout(() => {
-                                        record.style.transition = `left ${calcTime(150)}ms cubic-bezier(0.25, 1, 0.5, 1)`;
+                                        record.style.transition = `left ${calcUpdateDbTime(150)}ms cubic-bezier(0.25, 1, 0.5, 1)`;
                                         record.style.left = `${endX}px`;
 
                                         setTimeout(() => {
@@ -2423,11 +2427,11 @@
                                             sendMailAnimation(endX, endY, () => {
                                                 showFormSuccess(formId, '更新完了', onComplete);
                                             });
-                                        }, calcTime(150));
-                                    }, calcTime(150));
-                                }, calcTime(150));
+                                        }, calcUpdateDbTime(150));
+                                    }, calcUpdateDbTime(150));
+                                }, calcUpdateDbTime(150));
                             }
-                        }, calcTime(200)); 
+                        }, calcUpdateDbTime(200));
                     }, calcTime(100)); 
                 }
             }, calcTime(200));
@@ -2526,14 +2530,14 @@
                             const endY = targetRec.topY;
                             const detourX = midX + 190 + (index * 15); 
 
-                            record.style.transition = `left ${calcTime(150)}ms ease-out`;
+                            record.style.transition = `left ${calcUpdateDbTime(150)}ms ease-out`;
                             record.style.left = `${detourX}px`;
 
                             setTimeout(() => {
-                                record.style.transition = `top ${calcTime(150)}ms ease-in-out`;
+                                record.style.transition = `top ${calcUpdateDbTime(150)}ms ease-in-out`;
                                 record.style.top = `${endY}px`;
                                 setTimeout(() => {
-                                    record.style.transition = `left ${calcTime(150)}ms cubic-bezier(0.25, 1, 0.5, 1)`;
+                                    record.style.transition = `left ${calcUpdateDbTime(150)}ms cubic-bezier(0.25, 1, 0.5, 1)`;
                                     record.style.left = `${endX}px`;
                                     setTimeout(() => {
                                         targetRec.name = data.name; 
@@ -2552,9 +2556,9 @@
                                                 onComplete();
                                             }
                                         });
-                                    }, calcTime(150)); 
-                                }, calcTime(150));
-                            }, calcTime(150));
+                                    }, calcUpdateDbTime(150));
+                                }, calcUpdateDbTime(150));
+                            }, calcUpdateDbTime(150));
                         });
 
                     }, calcTime(260)); 
