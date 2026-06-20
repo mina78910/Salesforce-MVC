@@ -295,6 +295,9 @@
         .save-button.center-bottom {
             align-self: center;
         }
+        .form-card[data-user="3"] .save-button.center-bottom {
+            margin-top: auto;
+        }
         
         /* データ発射口（アニメーション座標用の不可視アンカー） */
         .form-outlet {
@@ -1730,7 +1733,7 @@
             if (!tbody) return;
 
             if (!rows || rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="2">更新対象レコードなし</td></tr>';
+                tbody.innerHTML = Array.from({ length: 5 }, () => '<tr><td>&nbsp;</td><td>&nbsp;</td></tr>').join('');
                 return;
             }
 
