@@ -2162,10 +2162,15 @@
             const contRect = container.getBoundingClientRect();
             const accRect = accInput.getBoundingClientRect();
             const zipRect = zipInput.getBoundingClientRect();
-            const outletRect = outletElem.getBoundingClientRect();
+            const cardRect = cardElem.getBoundingClientRect();
+            const uiRect = document.getElementById('tierUi').getBoundingClientRect();
             const badgeText = operation === 'insert' ? '登録' : '更新';
-            const assemblyX = outletRect.left - contRect.left + (outletRect.width - RECORD_WIDTH) / 2;
-            const assemblyY = outletRect.bottom - contRect.top + 12;
+            // 合体地点は「自分の画面」の直下に固定し、ロジック層へ向かう前に
+            // レコード化されたことが見えるようUI層の下端より内側へ収める。
+            const assemblyX = cardRect.left - contRect.left + (cardRect.width - RECORD_WIDTH) / 2;
+            const preferredAssemblyY = cardRect.bottom - contRect.top + 6;
+            const maxAssemblyY = uiRect.bottom - contRect.top - RECORD_HEIGHT - 4;
+            const assemblyY = Math.min(preferredAssemblyY, maxAssemblyY);
             const mergeNameX = assemblyX + 78;
             const mergeZipX = assemblyX + 38;
 
