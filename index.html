@@ -1492,6 +1492,7 @@
             </div>
             
             <button class="btn-global primary" id="submitBtn">1件実行</button>
+            <button class="btn-global" id="parallelBtn">一斉実行</button>
             <button class="btn-global success" id="autoBtn">▶ 自動実行</button>
             <button class="btn-global" id="clearBtn">リセット</button>
         </div>
@@ -1752,6 +1753,11 @@
         
         let isAutoRunning = false;
         let autoTimeout; // 自律自動実行用のタイマー
+        let isParallelRunning = false;
+        let parallelTimeout; // 一斉実行の連続投入タイマー
+        let activeParallelBatches = 0;
+        let parallelBatchSequence = 0;
+        let reservedParallelInsertSlots = new Set();
         let isAnimating = false;
 
         // 速度制御用
@@ -1782,6 +1788,7 @@
         
         const submitBtn = document.getElementById('submitBtn');
         const autoBtn = document.getElementById('autoBtn');
+        const parallelBtn = document.getElementById('parallelBtn');
         const clearBtn = document.getElementById('clearBtn');
         const toast = document.getElementById('toast');
         const speedSelect = document.getElementById('speedSelect');
@@ -2422,7 +2429,7 @@
         // ==========================================
         // 1件登録・更新用アニメーション (速度連動型)
         // ==========================================
-        function runSingleAnimation(operation, zipStr, accName, formId, targetDbIndex, onComplete) {
+        function runSingleAnimation(operation, zipStr, accName, formId, targetDbIndex, onComplete, preferredInsertIndex = null) {
             const outletElem = document.getElementById(`outlet${formId}`);
             
             if (operation === 'insert') nextAccountId++;
@@ -2511,7 +2518,8 @@
                         // フェーズ3: DB層へ
                         setTimeout(() => {
                             if (operation === 'insert') {
-                                const dbPos = getDbRecordPosition(dbRecords.length);
+                                const insertIndex = preferredInsertIndex ?? dbRecords.length;
+                                const dbPos = getDbRecordPosition(insertIndex);
                                 const endX = dbPos.x;
                                 
                                 if (dbRecords.length < MAX_CAPACITY) {
@@ -2523,14 +2531,17 @@
 
                                     setTimeout(() => {
                                         dbRecords.push({ id: nextAccountId - 1, name: accName, elem: record, topY: endY });
+                                        relayoutDbRecords();
+                                        const settledY = dbRecords[dbRecords.length - 1].topY;
                                         record.style.transition = `top ${calcTime(50)}ms ease-out`;
-                                        record.style.top = `${endY - 3}px`;
+                                        record.style.top = `${settledY - 3}px`;
                                         setTimeout(() => {
                                             record.style.transition = `top ${calcTime(50)}ms ease-in`;
-                                            record.style.top = `${endY}px`;
+                                            record.style.top = `${settledY}px`;
+                                            dbRecords[dbRecords.length - 1].topY = settledY;
                                             
                                             // レコード保存完了後、メール送信アニメーション発火
-                                            sendMailAnimation(endX, endY, () => {
+                                            sendMailAnimation(endX, settledY, () => {
                                                 showFormSuccess(formId, '新規作成完了', onComplete);
                                             });
                                         }, calcTime(50));
@@ -2621,10 +2632,10 @@
                 cardElem.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
             }, calcTime(100));
 
-            // Bulkコンテナ(3件の塊)生成
+            // Bulkコンテナ(対象件数分の塊)生成
             const bulk = document.createElement('div');
             bulk.className = 'record-bulk op-update';
-            let innerHTML = '<div class="record-bulk-header">Bulk Update (3件一括処理)</div>';
+            let innerHTML = `<div class="record-bulk-header">Bulk Update (${formObj.multiData.length}件一括処理)</div>`;
             formObj.multiData.forEach(d => {
                 innerHTML += `
                     <div class="record-bulk-item">
@@ -2732,6 +2743,204 @@
                     }, calcTime(260)); 
                 }, calcTime(200)); 
             }, calcTime(260)); 
+        }
+
+        function setControlsDisabled(disabled, includeParallel = true) {
+            submitBtn.disabled = disabled;
+            autoBtn.disabled = disabled;
+            clearBtn.disabled = disabled;
+            if (includeParallel) parallelBtn.disabled = disabled;
+        }
+
+        function setParallelRunningState(running) {
+            isParallelRunning = running;
+            parallelBtn.innerText = running ? '■ 一斉停止' : '一斉実行';
+            parallelBtn.className = running ? 'btn-global danger' : 'btn-global';
+            submitBtn.disabled = running;
+            autoBtn.disabled = running;
+            clearBtn.disabled = running;
+        }
+
+        function finishParallelIfIdle() {
+            if (isParallelRunning || activeParallelBatches > 0) return;
+            setParallelRunningState(false);
+            prepareNextOperation();
+        }
+
+        function reserveParallelInsertSlot() {
+            for (let index = dbRecords.length; index < MAX_CAPACITY; index++) {
+                if (!reservedParallelInsertSlots.has(index)) {
+                    reservedParallelInsertSlots.add(index);
+                    return index;
+                }
+            }
+            return null;
+        }
+
+        function releaseParallelInsertSlot(index) {
+            if (index === null || index === undefined) return;
+            reservedParallelInsertSlots.delete(index);
+        }
+
+        function buildParallelMultiData() {
+            const targetCount = Math.min(3, dbRecords.length);
+            if (targetCount <= 0) return [];
+
+            return dbRecords
+                .map((_, index) => index)
+                .sort(() => 0.5 - Math.random())
+                .slice(0, targetCount)
+                .sort((a, b) => a - b)
+                .map(idx => ({
+                    targetDbIndex: idx,
+                    name: dbRecords[idx].name.replace(/\(株\)/g, '株式会社'),
+                    zip: generateRandomZip()
+                }));
+        }
+
+        function pickRandomDbIndex() {
+            if (dbRecords.length === 0) return -1;
+            return Math.floor(Math.random() * dbRecords.length);
+        }
+
+        function buildParallelPrimaryOperations(sequence) {
+            const dbCount = dbRecords.length;
+            const preferNonInsert = dbCount > 5;
+            const operations = [
+                { formId: 1, operation: 'insert', targetDbIndex: -1, zip: generateRandomZip() },
+                { formId: 2, operation: 'insert', targetDbIndex: -1, zip: generateRandomZip() }
+            ];
+
+            if (dbCount > 0 && (preferNonInsert || sequence % 4 === 2)) {
+                operations[0].operation = 'update';
+                operations[0].targetDbIndex = pickRandomDbIndex();
+                operations[0].zip = generateRandomZip();
+            }
+
+            if (preferNonInsert || sequence % 4 === 1) {
+                operations[1].operation = 'insert';
+                operations[1].targetDbIndex = -1;
+                operations[1].zip = String(Math.floor(10000 + Math.random() * 90000));
+            } else if (dbCount > 0 && sequence % 4 === 3) {
+                operations[1].operation = 'update';
+                operations[1].targetDbIndex = pickRandomDbIndex();
+                operations[1].zip = generateRandomZip();
+            }
+
+            return operations.map((op, index) => {
+                const form = formsData.find(f => f.id === op.formId);
+                const targetRec = dbRecords[op.targetDbIndex];
+                return {
+                    ...op,
+                    delay: index * 170,
+                    name: op.operation === 'update' && targetRec
+                        ? targetRec.name.replace(/\(株\)/g, '株式会社')
+                        : `株式会社${form.preName} ${nextAccountId + index}`
+                };
+            });
+        }
+
+        function prepareParallelOperationForms(sequence, includeBulkUpdate = true) {
+            const primaryOperations = buildParallelPrimaryOperations(sequence);
+            primaryOperations.forEach(op => {
+                const form = formsData.find(f => f.id === op.formId);
+                const accInput = document.getElementById(`accName${op.formId}`);
+                const zipInput = document.getElementById(`zipInput${op.formId}`);
+                form.op = op.operation;
+                form.targetDbIndex = op.targetDbIndex;
+                accInput.value = op.name;
+                zipInput.value = op.zip;
+            });
+
+            const fukuoka = formsData.find(f => f.id === 3);
+            const singleRow = document.getElementById('singleRow3');
+            const multiRow = document.getElementById('multiRow3');
+            if (singleRow) singleRow.style.display = 'none';
+            if (multiRow) multiRow.style.display = 'block';
+            fukuoka.op = 'update-multi';
+            fukuoka.multiData = includeBulkUpdate ? buildParallelMultiData() : [];
+            renderFukuokaListView(fukuoka.multiData);
+
+            return primaryOperations;
+        }
+
+        function scheduleParallelTask(tasks, delayMs, runner) {
+            tasks.push(new Promise(resolve => {
+                setTimeout(() => runner(resolve), calcTime(delayMs));
+            }));
+        }
+
+        function startParallelBatch() {
+            if (!isParallelRunning) return;
+
+            const sequence = parallelBatchSequence++;
+            const shouldRunBulkUpdate = sequence % 2 === 0;
+            const shouldRunBatch = sequence % 4 === 0;
+
+            const primaryOperations = prepareParallelOperationForms(sequence, shouldRunBulkUpdate);
+            activeParallelBatches++;
+
+            const tasks = [];
+            primaryOperations.forEach(op => {
+                const reservesDbSlot = op.operation === 'insert' && op.zip.replace(/-/g, '').trim().length >= 7;
+                const preferredInsertIndex = reservesDbSlot ? reserveParallelInsertSlot() : null;
+
+                scheduleParallelTask(tasks, op.delay, done => {
+                    const runOperation = () => {
+                        runSingleAnimation(op.operation, op.zip, op.name, op.formId, op.targetDbIndex, () => {
+                            if (reservesDbSlot) {
+                                releaseParallelInsertSlot(preferredInsertIndex);
+                            }
+                            done();
+                        }, preferredInsertIndex);
+                    };
+
+                    if (op.operation === 'update') {
+                        fetchFromDB([op.targetDbIndex], op.formId, () => animateSaveButtonClick(op.formId, runOperation));
+                    } else {
+                        animateSaveButtonClick(op.formId, runOperation);
+                    }
+                });
+            });
+
+            const fukuoka = formsData.find(f => f.id === 3);
+            const fukuokaMultiData = fukuoka.multiData.map(data => ({ ...data }));
+            if (shouldRunBulkUpdate && fukuokaMultiData.length > 0) {
+                const fetchTargets = fukuokaMultiData.map(d => d.targetDbIndex);
+                scheduleParallelTask(tasks, 340, done => {
+                    fetchFromDB(fetchTargets, 3, () => {
+                        animateSaveButtonClick(3, () => {
+                            startMultiAnimation({ ...fukuoka, multiData: fukuokaMultiData }, 3, done);
+                        });
+                    });
+                });
+            }
+
+            if (shouldRunBatch && dbRecords.length > 0) {
+                scheduleParallelTask(tasks, 520, done => runBatchAnimation(done));
+            }
+
+            parallelTimeout = setTimeout(startParallelBatch, calcTime(900));
+
+            Promise.all(tasks).then(() => {
+                activeParallelBatches--;
+                finishParallelIfIdle();
+            });
+        }
+
+        function toggleParallelMode() {
+            if (isParallelRunning) {
+                isParallelRunning = false;
+                clearTimeout(parallelTimeout);
+                parallelBtn.innerText = '停止中...';
+                finishParallelIfIdle();
+                return;
+            }
+
+            if (isAutoRunning || isAnimating) return;
+            parallelBatchSequence = 0;
+            setParallelRunningState(true);
+            startParallelBatch();
         }
 
         // ==========================================
@@ -2857,9 +3066,11 @@
 
         // イベント制御
         submitBtn.addEventListener('click', () => {
-            if(isAutoRunning || isAnimating) return;
+            if(isAutoRunning || isParallelRunning || isAnimating) return;
             processRecord();
         });
+
+        parallelBtn.addEventListener('click', toggleParallelMode);
 
         autoBtn.addEventListener('click', () => {
             if (isAutoRunning) {
@@ -2868,11 +3079,13 @@
                 autoBtn.innerText = '▶ 自動実行';
                 autoBtn.className = 'btn-global success';
                 submitBtn.disabled = false;
+                parallelBtn.disabled = false;
             } else {
                 isAutoRunning = true;
                 autoBtn.innerText = '■ 停止';
                 autoBtn.className = 'btn-global danger';
                 submitBtn.disabled = true;
+                parallelBtn.disabled = true;
                 
                 processRecord();
             }
@@ -2887,6 +3100,12 @@
             document.querySelectorAll('.record-bulk').forEach(r => r.remove());
             
             isAnimating = false;
+            isParallelRunning = false;
+            activeParallelBatches = 0;
+            parallelBatchSequence = 0;
+            reservedParallelInsertSlots.clear();
+            clearTimeout(parallelTimeout);
+            setParallelRunningState(false);
             toast.classList.remove('show');
 
             // インジケーターのクリア
@@ -2905,6 +3124,7 @@
                 autoBtn.innerText = '▶ 自動実行';
                 autoBtn.className = 'btn-global success';
                 submitBtn.disabled = false;
+                parallelBtn.disabled = false;
             }
             prepareNextOperation();
         });
