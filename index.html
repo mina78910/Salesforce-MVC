@@ -665,6 +665,56 @@
             color: #706e6b; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
+
+        /* フォーム項目が画面から飛び出し、画面下でレコードへ合体する演出 */
+        .field-flyer, .record-assembly-preview {
+            position: absolute;
+            z-index: 210;
+            pointer-events: none;
+            box-sizing: border-box;
+        }
+        .field-flyer {
+            height: 24px;
+            padding: 4px 9px;
+            border-radius: 999px;
+            background: #ffffff;
+            border: 2px solid #1589ee;
+            box-shadow: 0 10px 24px rgba(22, 50, 92, 0.22);
+            color: #16325c;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            will-change: left, top, transform, opacity;
+        }
+        .field-flyer.zip {
+            border-color: #c23934;
+            color: #c23934;
+            font-family: monospace;
+        }
+        .field-flyer .field-label {
+            font-size: 9px;
+            color: #706e6b;
+            font-family: inherit;
+        }
+        .record-assembly-preview {
+            width: 190px;
+            height: 24px;
+            opacity: 0;
+            transform: scale(0.72);
+            transition: opacity calc(120ms * var(--speed-ratio)) ease, transform calc(180ms * var(--speed-ratio)) cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .record-assembly-preview.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .form-card.extracting-fields input {
+            background: #eef4ff;
+            box-shadow: inset 0 0 0 2px rgba(21, 137, 238, 0.35);
+        }
+
         /* Bulkレコードブロック */
         .record-bulk {
             position: absolute;
@@ -2094,6 +2144,87 @@
         // ==========================================
         // 個別エラー表示 (速度連動型)
         // ==========================================
+
+        // ==========================================
+        // 画面項目からレコードが生成されるアニメーション
+        // ==========================================
+        function animateFieldsToRecord(formId, zipStr, accName, operation, onComplete) {
+            const accInput = document.getElementById(`accName${formId}`);
+            const zipInput = document.getElementById(`zipInput${formId}`);
+            const outletElem = document.getElementById(`outlet${formId}`);
+            const cardElem = document.getElementById(`form${formId}`);
+
+            if (!accInput || !zipInput || !outletElem) {
+                onComplete(null);
+                return;
+            }
+
+            const contRect = container.getBoundingClientRect();
+            const accRect = accInput.getBoundingClientRect();
+            const zipRect = zipInput.getBoundingClientRect();
+            const cardRect = cardElem.getBoundingClientRect();
+            const uiRect = document.getElementById('tierUi').getBoundingClientRect();
+            const badgeText = operation === 'insert' ? '登録' : '更新';
+            // 合体地点は「自分の画面」の直下に固定し、ロジック層へ向かう前に
+            // レコード化されたことが見えるようUI層の下端より内側へ収める。
+            const assemblyX = cardRect.left - contRect.left + (cardRect.width - RECORD_WIDTH) / 2;
+            const preferredAssemblyY = cardRect.bottom - contRect.top + 6;
+            const maxAssemblyY = uiRect.bottom - contRect.top - RECORD_HEIGHT - 4;
+            const assemblyY = Math.min(preferredAssemblyY, maxAssemblyY);
+            const mergeNameX = assemblyX + 78;
+            const mergeZipX = assemblyX + 38;
+
+            const makeFlyer = (className, label, value, rect) => {
+                const flyer = document.createElement('div');
+                flyer.className = `field-flyer ${className}`;
+                flyer.innerHTML = `<span class="field-label">${label}</span><span>${value}</span>`;
+                flyer.style.left = `${rect.left - contRect.left}px`;
+                flyer.style.top = `${rect.top - contRect.top + (rect.height - 24) / 2}px`;
+                container.appendChild(flyer);
+                return flyer;
+            };
+
+            const nameFlyer = makeFlyer('name', '取引先名', accName, accRect);
+            const zipFlyer = makeFlyer('zip', '郵便番号', `〒${zipStr}`, zipRect);
+            const preview = document.createElement('div');
+            preview.className = `record-assembly-preview record-item op-${operation}`;
+            preview.innerHTML = `
+                <span class="rec-badge">${badgeText}</span>
+                <span class="zipcode">〒${zipStr}</span>
+                <span class="acc-name">${accName}</span>
+            `;
+            preview.style.left = `${assemblyX}px`;
+            preview.style.top = `${assemblyY}px`;
+            container.appendChild(preview);
+
+            cardElem.classList.add('extracting-fields');
+            void nameFlyer.offsetWidth;
+
+            const flyDuration = calcTime(360);
+            const transition = `left ${flyDuration}ms cubic-bezier(0.22, 0.61, 0.36, 1), top ${flyDuration}ms cubic-bezier(0.22, 0.61, 0.36, 1), transform ${flyDuration}ms ease, opacity ${calcTime(120)}ms ease ${calcTime(240)}ms`;
+            nameFlyer.style.transition = transition;
+            zipFlyer.style.transition = transition;
+            nameFlyer.style.left = `${mergeNameX}px`;
+            nameFlyer.style.top = `${assemblyY}px`;
+            nameFlyer.style.transform = 'scale(0.86)';
+            nameFlyer.style.opacity = '0';
+            zipFlyer.style.left = `${mergeZipX}px`;
+            zipFlyer.style.top = `${assemblyY}px`;
+            zipFlyer.style.transform = 'scale(0.86)';
+            zipFlyer.style.opacity = '0';
+
+            setTimeout(() => {
+                preview.classList.add('show');
+                setTimeout(() => {
+                    nameFlyer.remove();
+                    zipFlyer.remove();
+                    preview.remove();
+                    cardElem.classList.remove('extracting-fields');
+                    onComplete({ x: assemblyX, y: assemblyY });
+                }, calcTime(170));
+            }, flyDuration - calcTime(80));
+        }
+
         function showFormError(formId, msg, onComplete) {
             const errElem = document.getElementById(`formErr${formId}`);
             if(errElem) {
@@ -2126,6 +2257,7 @@
             
             if (operation === 'insert') nextAccountId++;
 
+            animateFieldsToRecord(formId, zipStr, accName, operation, (assemblyPoint) => {
             const cardElem = document.getElementById(`form${formId}`);
             cardElem.style.transform = 'scale(1.02)';
             cardElem.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
@@ -2149,8 +2281,8 @@
             const logicRect = logicZone.getBoundingClientRect();
             const dbRect = dbBox.getBoundingClientRect();
 
-            const startX = outletRect.left - contRect.left + (outletRect.width - RECORD_WIDTH) / 2;
-            const startY = outletRect.bottom - contRect.top;
+            const startX = assemblyPoint ? assemblyPoint.x : outletRect.left - contRect.left + (outletRect.width - RECORD_WIDTH) / 2;
+            const startY = assemblyPoint ? assemblyPoint.y : outletRect.bottom - contRect.top;
             const midX = logicRect.left - contRect.left + (logicRect.width - RECORD_WIDTH) / 2;
             const midY = logicRect.top - contRect.top + (logicRect.height - RECORD_HEIGHT) / 2;
 
@@ -2301,6 +2433,7 @@
                     }, calcTime(100)); 
                 }
             }, calcTime(200));
+            });
         }
 
         // ==========================================
