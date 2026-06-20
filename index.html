@@ -175,6 +175,31 @@
             top: -15px;
         }
 
+        /* ロジック層とデータベース層の区切り線は、バッチ処理ボックスの上を横切らないよう左側で止める */
+        .tier-logic {
+            border-bottom: none;
+        }
+        .tier-logic::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: calc(100% - 400px);
+            border-bottom: 2px dashed rgba(112, 110, 107, 0.45);
+            pointer-events: none;
+            z-index: 1;
+        }
+        .tier-db::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 400px;
+            height: 100%;
+            border-left: 2px dashed rgba(112, 110, 107, 0.45);
+            pointer-events: none;
+            z-index: 1;
+        }
+
         /* === 上段: UI層 (画面) === */
         .tier-ui {
             flex: 1.4;
@@ -1130,6 +1155,8 @@
             .tier-label { left: 12px; font-size: 12px; }
             .info-bubble { width: 330px; bottom: 8px; left: 32px; padding: 10px 12px; }
             .batch-logic-wrapper, .after-logic-wrapper { right: 88px; }
+            .tier-logic::after { width: calc(100% - 320px); }
+            .tier-db::before { right: 320px; }
             .midnight-indicator { right: 88px; bottom: 190px; }
             .after-logic-wrapper { transform: translateY(-50%) scale(0.92); transform-origin: right center; }
             .batch-logic-wrapper { transform: scale(0.92); transform-origin: right bottom; }
@@ -1331,6 +1358,8 @@
                 height: 44px;
                 border-radius: 7px;
             }
+            .tier-logic::after { width: calc(100% - 142px); }
+            .tier-db::before { right: 142px; }
             .after-logic-wrapper::before,
             .after-logic-wrapper::after,
             .batch-logic-wrapper::before,
