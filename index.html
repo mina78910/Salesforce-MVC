@@ -2613,13 +2613,13 @@
             
             indElem.className = `form-action-indicator ${formObj.op}`;
             if (formObj.op === 'insert') {
-                titleElem.innerText = '✨ 新規登録';
+                titleElem.innerText = '新規登録';
                 descElem.innerText = 'レコード作成処理を実行中...';
             } else if (formObj.op === 'update') {
-                titleElem.innerText = '🔄 既存更新';
+                titleElem.innerText = '既存更新';
                 descElem.innerText = '既存レコードを更新中...';
             } else if (formObj.op === 'update-multi') {
-                titleElem.innerText = '📑 一括更新';
+                titleElem.innerText = 'リストビュー一括更新';
                 descElem.innerText = '3件 of レコードを同時更新中...';
             }
             indElem.classList.add('show');
