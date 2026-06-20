@@ -1753,6 +1753,9 @@
         
         let isAutoRunning = false;
         let autoTimeout; // 自律自動実行用のタイマー
+        let isParallelRunning = false;
+        let parallelTimeout; // 一斉実行の連続投入タイマー
+        let activeParallelBatches = 0;
         let isAnimating = false;
 
         // 速度制御用
@@ -2743,6 +2746,21 @@
             if (includeParallel) parallelBtn.disabled = disabled;
         }
 
+        function setParallelRunningState(running) {
+            isParallelRunning = running;
+            parallelBtn.innerText = running ? '■ 一斉停止' : '一斉実行';
+            parallelBtn.className = running ? 'btn-global danger' : 'btn-global';
+            submitBtn.disabled = running;
+            autoBtn.disabled = running;
+            clearBtn.disabled = running;
+        }
+
+        function finishParallelIfIdle() {
+            if (isParallelRunning || activeParallelBatches > 0) return;
+            setParallelRunningState(false);
+            prepareNextOperation();
+        }
+
         function buildParallelMultiData() {
             const targetCount = Math.min(3, dbRecords.length);
             if (targetCount <= 0) return [];
@@ -2781,45 +2799,66 @@
             renderFukuokaListView(fukuoka.multiData);
         }
 
-        function runParallelMode() {
-            if (isAutoRunning || isAnimating) return;
+        function scheduleParallelTask(tasks, delayMs, runner) {
+            tasks.push(new Promise(resolve => {
+                setTimeout(() => runner(resolve), calcTime(delayMs));
+            }));
+        }
 
-            isAnimating = true;
+        function startParallelBatch() {
+            if (!isParallelRunning) return;
+
             prepareParallelOperationForms();
-            setControlsDisabled(true);
+            activeParallelBatches++;
 
             const tasks = [];
-            const addTask = (runner) => tasks.push(new Promise(resolve => runner(resolve)));
-
-            [1, 2].forEach(formId => {
-                addTask(done => {
+            [1, 2].forEach((formId, index) => {
+                const zipStr = document.getElementById(`zipInput${formId}`).value;
+                const accName = document.getElementById(`accName${formId}`).value;
+                scheduleParallelTask(tasks, index * 170, done => {
                     animateSaveButtonClick(formId, () => {
-                        const zipStr = document.getElementById(`zipInput${formId}`).value;
-                        const accName = document.getElementById(`accName${formId}`).value;
                         runSingleAnimation('insert', zipStr, accName, formId, -1, done);
                     });
                 });
             });
 
             const fukuoka = formsData.find(f => f.id === 3);
-            if (fukuoka.multiData.length > 0) {
-                const fetchTargets = fukuoka.multiData.map(d => d.targetDbIndex);
-                addTask(done => {
+            const fukuokaMultiData = fukuoka.multiData.map(data => ({ ...data }));
+            if (fukuokaMultiData.length > 0) {
+                const fetchTargets = fukuokaMultiData.map(d => d.targetDbIndex);
+                scheduleParallelTask(tasks, 340, done => {
                     fetchFromDB(fetchTargets, 3, () => {
-                        animateSaveButtonClick(3, () => startMultiAnimation(fukuoka, 3, done));
+                        animateSaveButtonClick(3, () => {
+                            startMultiAnimation({ ...fukuoka, multiData: fukuokaMultiData }, 3, done);
+                        });
                     });
                 });
             }
 
             if (dbRecords.length > 0) {
-                addTask(done => setTimeout(() => runBatchAnimation(done), calcTime(220)));
+                scheduleParallelTask(tasks, 520, done => runBatchAnimation(done));
             }
 
+            parallelTimeout = setTimeout(startParallelBatch, calcTime(900));
+
             Promise.all(tasks).then(() => {
-                isAnimating = false;
-                setControlsDisabled(false);
-                prepareNextOperation();
+                activeParallelBatches--;
+                finishParallelIfIdle();
             });
+        }
+
+        function toggleParallelMode() {
+            if (isParallelRunning) {
+                isParallelRunning = false;
+                clearTimeout(parallelTimeout);
+                parallelBtn.innerText = '停止中...';
+                finishParallelIfIdle();
+                return;
+            }
+
+            if (isAutoRunning || isAnimating) return;
+            setParallelRunningState(true);
+            startParallelBatch();
         }
 
         // ==========================================
@@ -2945,11 +2984,11 @@
 
         // イベント制御
         submitBtn.addEventListener('click', () => {
-            if(isAutoRunning || isAnimating) return;
+            if(isAutoRunning || isParallelRunning || isAnimating) return;
             processRecord();
         });
 
-        parallelBtn.addEventListener('click', runParallelMode);
+        parallelBtn.addEventListener('click', toggleParallelMode);
 
         autoBtn.addEventListener('click', () => {
             if (isAutoRunning) {
@@ -2979,6 +3018,10 @@
             document.querySelectorAll('.record-bulk').forEach(r => r.remove());
             
             isAnimating = false;
+            isParallelRunning = false;
+            activeParallelBatches = 0;
+            clearTimeout(parallelTimeout);
+            setParallelRunningState(false);
             toast.classList.remove('show');
 
             // インジケーターのクリア
