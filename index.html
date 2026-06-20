@@ -865,6 +865,9 @@
             left: 50%;
             transform: translate(-50%, -12px);
             color: white;
+            width: 80%;
+            box-sizing: border-box;
+            justify-content: center;
             padding: 10px 18px;
             border-radius: 4px;
             font-size: 12px;
@@ -2638,6 +2641,8 @@
             if (currentStep === 6) targetFormId = 3;
 
             const formObj = formsData.find(f => f.id === targetFormId);
+            const actionIndicatorDisplayDuration = calcTime(500);
+            let actionIndicatorHideTimeout = null;
 
             // インジケーター表示
             const indElem = document.getElementById(`actionInd${targetFormId}`);
@@ -2654,9 +2659,17 @@
             }
             indElem.classList.add('show');
             overlayElem.classList.add('show');
+            actionIndicatorHideTimeout = setTimeout(() => {
+                indElem.classList.remove('show');
+                overlayElem.classList.remove('show');
+            }, actionIndicatorDisplayDuration);
 
             // 処理完了時のコールバック定義 (自律トリガーを呼ぶ)
             const finishOperation = () => {
+                if (actionIndicatorHideTimeout) {
+                    clearTimeout(actionIndicatorHideTimeout);
+                    actionIndicatorHideTimeout = null;
+                }
                 indElem.classList.remove('show');
                 overlayElem.classList.remove('show');
                 isAnimating = false;
