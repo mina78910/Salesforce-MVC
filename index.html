@@ -1757,6 +1757,7 @@
         let parallelTimeout; // 一斉実行の連続投入タイマー
         let activeParallelBatches = 0;
         let parallelBatchSequence = 0;
+        let reservedParallelInsertSlots = 0;
         let isAnimating = false;
 
         // 速度制御用
@@ -2428,7 +2429,7 @@
         // ==========================================
         // 1件登録・更新用アニメーション (速度連動型)
         // ==========================================
-        function runSingleAnimation(operation, zipStr, accName, formId, targetDbIndex, onComplete) {
+        function runSingleAnimation(operation, zipStr, accName, formId, targetDbIndex, onComplete, preferredInsertIndex = null) {
             const outletElem = document.getElementById(`outlet${formId}`);
             
             if (operation === 'insert') nextAccountId++;
@@ -2517,10 +2518,11 @@
                         // フェーズ3: DB層へ
                         setTimeout(() => {
                             if (operation === 'insert') {
-                                const dbPos = getDbRecordPosition(dbRecords.length);
+                                const insertIndex = preferredInsertIndex ?? dbRecords.length;
+                                const dbPos = getDbRecordPosition(insertIndex);
                                 const endX = dbPos.x;
                                 
-                                if (dbRecords.length < MAX_CAPACITY) {
+                                if (dbRecords.length < MAX_CAPACITY && insertIndex < MAX_CAPACITY) {
                                     const endY = dbPos.y;
                                     
                                     record.style.transition = `top ${calcTime(200)}ms cubic-bezier(0.55, 0.085, 0.68, 0.53), left ${calcTime(200)}ms ease-in-out`;
@@ -2819,9 +2821,14 @@
             [1, 2].forEach((formId, index) => {
                 const zipStr = document.getElementById(`zipInput${formId}`).value;
                 const accName = document.getElementById(`accName${formId}`).value;
+                const preferredInsertIndex = dbRecords.length + reservedParallelInsertSlots;
+                reservedParallelInsertSlots++;
                 scheduleParallelTask(tasks, index * 170, done => {
                     animateSaveButtonClick(formId, () => {
-                        runSingleAnimation('insert', zipStr, accName, formId, -1, done);
+                        runSingleAnimation('insert', zipStr, accName, formId, -1, () => {
+                            reservedParallelInsertSlots = Math.max(0, reservedParallelInsertSlots - 1);
+                            done();
+                        }, preferredInsertIndex);
                     });
                 });
             });
@@ -3026,6 +3033,7 @@
             isParallelRunning = false;
             activeParallelBatches = 0;
             parallelBatchSequence = 0;
+            reservedParallelInsertSlots = 0;
             clearTimeout(parallelTimeout);
             setParallelRunningState(false);
             toast.classList.remove('show');
