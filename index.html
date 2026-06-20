@@ -1757,7 +1757,7 @@
         let parallelTimeout; // 一斉実行の連続投入タイマー
         let activeParallelBatches = 0;
         let parallelBatchSequence = 0;
-        let reservedParallelInsertSlots = 0;
+        let reservedParallelInsertSlots = new Set();
         let isAnimating = false;
 
         // 速度制御用
@@ -2522,7 +2522,7 @@
                                 const dbPos = getDbRecordPosition(insertIndex);
                                 const endX = dbPos.x;
                                 
-                                if (dbRecords.length < MAX_CAPACITY && insertIndex < MAX_CAPACITY) {
+                                if (dbRecords.length < MAX_CAPACITY) {
                                     const endY = dbPos.y;
                                     
                                     record.style.transition = `top ${calcTime(200)}ms cubic-bezier(0.55, 0.085, 0.68, 0.53), left ${calcTime(200)}ms ease-in-out`;
@@ -2531,14 +2531,17 @@
 
                                     setTimeout(() => {
                                         dbRecords.push({ id: nextAccountId - 1, name: accName, elem: record, topY: endY });
+                                        relayoutDbRecords();
+                                        const settledY = dbRecords[dbRecords.length - 1].topY;
                                         record.style.transition = `top ${calcTime(50)}ms ease-out`;
-                                        record.style.top = `${endY - 3}px`;
+                                        record.style.top = `${settledY - 3}px`;
                                         setTimeout(() => {
                                             record.style.transition = `top ${calcTime(50)}ms ease-in`;
-                                            record.style.top = `${endY}px`;
+                                            record.style.top = `${settledY}px`;
+                                            dbRecords[dbRecords.length - 1].topY = settledY;
                                             
                                             // レコード保存完了後、メール送信アニメーション発火
-                                            sendMailAnimation(endX, endY, () => {
+                                            sendMailAnimation(endX, settledY, () => {
                                                 showFormSuccess(formId, '新規作成完了', onComplete);
                                             });
                                         }, calcTime(50));
@@ -2764,6 +2767,21 @@
             prepareNextOperation();
         }
 
+        function reserveParallelInsertSlot() {
+            for (let index = dbRecords.length; index < MAX_CAPACITY; index++) {
+                if (!reservedParallelInsertSlots.has(index)) {
+                    reservedParallelInsertSlots.add(index);
+                    return index;
+                }
+            }
+            return null;
+        }
+
+        function releaseParallelInsertSlot(index) {
+            if (index === null || index === undefined) return;
+            reservedParallelInsertSlots.delete(index);
+        }
+
         function buildParallelMultiData() {
             const targetCount = Math.min(3, dbRecords.length);
             if (targetCount <= 0) return [];
@@ -2864,14 +2882,13 @@
             const tasks = [];
             primaryOperations.forEach(op => {
                 const reservesDbSlot = op.operation === 'insert' && op.zip.replace(/-/g, '').trim().length >= 7;
-                const preferredInsertIndex = reservesDbSlot ? dbRecords.length + reservedParallelInsertSlots : null;
-                if (reservesDbSlot) reservedParallelInsertSlots++;
+                const preferredInsertIndex = reservesDbSlot ? reserveParallelInsertSlot() : null;
 
                 scheduleParallelTask(tasks, op.delay, done => {
                     const runOperation = () => {
                         runSingleAnimation(op.operation, op.zip, op.name, op.formId, op.targetDbIndex, () => {
                             if (reservesDbSlot) {
-                                reservedParallelInsertSlots = Math.max(0, reservedParallelInsertSlots - 1);
+                                releaseParallelInsertSlot(preferredInsertIndex);
                             }
                             done();
                         }, preferredInsertIndex);
@@ -3085,7 +3102,7 @@
             isParallelRunning = false;
             activeParallelBatches = 0;
             parallelBatchSequence = 0;
-            reservedParallelInsertSlots = 0;
+            reservedParallelInsertSlots.clear();
             clearTimeout(parallelTimeout);
             setParallelRunningState(false);
             toast.classList.remove('show');
